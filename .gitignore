@@ -34,3 +34,5 @@ app/sessions/
 # 本地评测结果，不提交到仓库
 app/evaluation/result/
 app/evaluation/rag_result/
+app/evaluation/rag/rag_index/
+app/evaluation/rag/rag_result/

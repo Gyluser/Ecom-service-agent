@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from app.agent.rag.backends.base import RetrievedChunk, VectorBackend
@@ -85,7 +86,16 @@ class ChromaBackend(VectorBackend):
             embeddings=vectors,
             documents=[c.text for c in chunks],
             metadatas=[
-                {"doc": c.doc, "section": c.section, "chunk_id": c.chunk_id}
+                {
+                    "doc": c.doc,
+                    "section": c.section,
+                    "chunk_id": c.chunk_id,
+                    "parent_id": c.parent_id,
+                    "section_path": json.dumps(c.section_path, ensure_ascii=False),
+                    "source": c.source,
+                    "chunk_type": c.chunk_type,
+                    "chunking_version": c.chunking_version,
+                }
                 for c in chunks
             ],
         )
@@ -114,6 +124,11 @@ class ChromaBackend(VectorBackend):
                 doc=meta.get("doc", ""),
                 section=meta.get("section", ""),
                 text=doc_text,
+                parent_id=meta.get("parent_id", ""),
+                section_path=json.loads(meta.get("section_path", "[]")),
+                source=meta.get("source", ""),
+                chunk_type=meta.get("chunk_type", "section"),
+                chunking_version=meta.get("chunking_version", "legacy-h2-v1"),
             )
             score = 1.0 - float(dist)  # cosine distance → similarity
             out.append(RetrievedChunk(chunk=chunk, score=score))

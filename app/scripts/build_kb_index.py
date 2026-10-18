@@ -9,7 +9,7 @@
   python app/scripts/build_kb_index.py --backend chroma
 
 流程：
-  1. 扫描 knowledge/ 下的所有 .md 文件，按二级标题切分。
+  1. 扫描 knowledge/ 下的所有 .md 文件，按 Markdown 结构和业务语义单元切分。
   2. 调用 OpenAI Embeddings 将每个 chunk 向量化。
   3. 通过 backend.upsert 持久化索引（NumpyBackend 写 JSON / ChromaBackend 写 PersistentClient）。
 """
@@ -27,18 +27,29 @@ from app.agent.rag.chunker import chunk_markdown_dir  # noqa: E402
 from app.agent.rag.embedder import Embedder  # noqa: E402
 
 
-def _build_backend(name: str):
+def _rooted_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
+
+
+def _build_backend(
+    name: str,
+    *,
+    index_path: Path,
+    chroma_persist_dir: Path,
+    chroma_collection: str,
+):
     if name == "numpy":
         return create_backend(
             "numpy",
-            index_path=ROOT / settings.kb_index_path,
-        ), str(ROOT / settings.kb_index_path)
+            index_path=index_path,
+        ), str(index_path)
     if name == "chroma":
         return create_backend(
             "chroma",
-            persist_dir=ROOT / settings.chroma_persist_dir,
-            collection_name=settings.chroma_collection,
-        ), f"{ROOT / settings.chroma_persist_dir} (collection={settings.chroma_collection})"
+            persist_dir=chroma_persist_dir,
+            collection_name=chroma_collection,
+        ), f"{chroma_persist_dir} (collection={chroma_collection})"
     raise ValueError(f"未知后端: {name}")
 
 
@@ -50,15 +61,45 @@ def main():
         default=settings.rag_backend,
         help=f"向量后端（默认: {settings.rag_backend}）",
     )
+    parser.add_argument(
+        "--kb-dir",
+        default=None,
+        help="覆盖知识库 Markdown 目录；相对路径以项目根目录为基准",
+    )
+    parser.add_argument(
+        "--index-path",
+        default=None,
+        help="覆盖 Numpy JSON 索引路径；相对路径以项目根目录为基准",
+    )
+    parser.add_argument(
+        "--chroma-persist-dir",
+        default=None,
+        help="覆盖 Chroma 持久化目录；相对路径以项目根目录为基准",
+    )
+    parser.add_argument(
+        "--collection",
+        default=None,
+        help=f"覆盖 Chroma collection 名称（默认: {settings.chroma_collection}）",
+    )
     args = parser.parse_args()
 
-    kb_dir = ROOT / settings.kb_dir
+    kb_dir = _rooted_path(args.kb_dir or settings.kb_dir)
+    index_path = _rooted_path(args.index_path or settings.kb_index_path)
+    chroma_persist_dir = _rooted_path(
+        args.chroma_persist_dir or settings.chroma_persist_dir
+    )
+    chroma_collection = args.collection or settings.chroma_collection
 
     if not kb_dir.exists():
         print(f"❌ 知识库目录不存在: {kb_dir}")
         sys.exit(1)
 
-    backend, target_desc = _build_backend(args.backend)
+    backend, target_desc = _build_backend(
+        args.backend,
+        index_path=index_path,
+        chroma_persist_dir=chroma_persist_dir,
+        chroma_collection=chroma_collection,
+    )
 
     print("=" * 60)
     print("  并夕夕 · 知识库索引构建")

@@ -32,17 +32,44 @@ sys.path.insert(0, str(ROOT))
 from app.agent.chat import EcomAgent  # noqa: E402
 from app.config.settings import settings  # noqa: E402
 from app.agent.rag.backends import create_backend  # noqa: E402
-from app.agent.rag.chunker import chunk_markdown_dir  # noqa: E402
+from app.agent.rag.chunker import CHUNKING_VERSION, chunk_markdown_dir  # noqa: E402
 from app.agent.rag.embedder import Embedder  # noqa: E402
 from app.agent.rag.retriever import KnowledgeRetriever  # noqa: E402
 from app.schemas.response import CustomerServiceResponse, IntentType  # noqa: E402
 from app.agent.tools import knowledge as knowledge_tool  # noqa: E402
 
 TEST_SESSION = str(ROOT / "app" / "sessions" / "test_rag_session.json")
-RESULT_DIR = ROOT / "app" / "evaluation" / "rag_result"
 EXPECTED_DOCS = {"退换货政策", "配送说明", "会员权益", "常见问题FAQ"}
+KB_DIR = ROOT / settings.kb_dir
+INDEX_PATH = ROOT / settings.kb_index_path
+CHROMA_PERSIST_DIR = ROOT / settings.chroma_persist_dir
+CHROMA_COLLECTION = settings.chroma_collection
+RESULT_DIR = ROOT / "app" / "evaluation" / "rag_result"
 RUN_REPORT: dict = {}
 CURRENT_BACKEND_RESULT: dict | None = None
+
+
+def _rooted_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
+
+
+def _configure_paths(corpus: str):
+    """选择正式或评估语料、索引和结果目录，默认保持正式模式。"""
+    global KB_DIR, INDEX_PATH, CHROMA_PERSIST_DIR, CHROMA_COLLECTION, RESULT_DIR
+    if corpus == "evaluation":
+        evaluation_root = ROOT / "app" / "evaluation" / "rag"
+        KB_DIR = evaluation_root / "rag_knowledge"
+        INDEX_PATH = evaluation_root / "rag_index" / "kb_index.json"
+        CHROMA_PERSIST_DIR = evaluation_root / "rag_index" / "chroma"
+        CHROMA_COLLECTION = "ecom_rag_evaluation"
+        RESULT_DIR = evaluation_root / "rag_result"
+    else:
+        KB_DIR = _rooted_path(settings.kb_dir)
+        INDEX_PATH = _rooted_path(settings.kb_index_path)
+        CHROMA_PERSIST_DIR = _rooted_path(settings.chroma_persist_dir)
+        CHROMA_COLLECTION = settings.chroma_collection
+        RESULT_DIR = ROOT / "app" / "evaluation" / "rag_result"
 
 
 def _ok(msg: str):
@@ -111,20 +138,20 @@ def _make_embedder() -> Embedder:
 
 def _make_backend(backend_name: str):
     if backend_name == "numpy":
-        return create_backend("numpy", index_path=ROOT / settings.kb_index_path)
+        return create_backend("numpy", index_path=INDEX_PATH)
     if backend_name == "chroma":
         return create_backend(
             "chroma",
-            persist_dir=ROOT / settings.chroma_persist_dir,
-            collection_name=settings.chroma_collection,
+            persist_dir=CHROMA_PERSIST_DIR,
+            collection_name=CHROMA_COLLECTION,
         )
     raise ValueError(backend_name)
 
 
 # ---------- 测试 1：切分 ----------
 def test_chunker():
-    print("\n  [1/5] Markdown 切分")
-    chunks = chunk_markdown_dir(ROOT / settings.kb_dir)
+    print("\n  [1/5] Markdown 结构与业务语义切分")
+    chunks = chunk_markdown_dir(KB_DIR)
     if not chunks:
         _fail("未切到任何 chunk")
     docs = {c.doc for c in chunks}
@@ -134,6 +161,21 @@ def test_chunker():
     for c in chunks:
         if not c.text.startswith("【"):
             _fail(f"chunk 文本未注入文档/章节标题: {c.chunk_id}")
+        if not c.parent_id or not c.section_path or not c.source:
+            _fail(f"chunk 元数据不完整: {c.chunk_id}")
+        if c.chunking_version != CHUNKING_VERSION:
+            _fail(f"chunk 分块版本不正确: {c.chunk_id} -> {c.chunking_version}")
+
+    chunk_ids = {c.chunk_id for c in chunks}
+    required_ids = {
+        "会员权益::二、各等级核心权益::2.4 钻石会员",
+        "常见问题FAQ::三、售后服务::Q9：退款多久到账？",
+        "退换货政策::一、七天无理由退货::1.3 运费规则",
+        "配送说明::三、运费规则::偏远地区与会员包邮例外",
+    }
+    missing_ids = required_ids - chunk_ids
+    if missing_ids:
+        _fail(f"未生成预期的业务语义 chunk: {missing_ids}")
     CURRENT_BACKEND_RESULT["chunker"] = {
         "status": "passed",
         "chunk_count": len(chunks),
@@ -148,7 +190,7 @@ def test_chunker():
             for c in chunks
         ],
     }
-    _ok(f"切分共 {len(chunks)} 个 chunk，覆盖文档 {docs}")
+    _ok(f"切分共 {len(chunks)} 个业务 chunk，覆盖文档 {docs}")
 
 
 # ---------- 测试 2：构建/复用索引 ----------
@@ -156,22 +198,43 @@ def test_build_index(backend_name: str):
     print(f"\n  [2/5] 构建/加载向量索引（backend={backend_name}）")
     embedder = _make_embedder()
     backend = _make_backend(backend_name)
+    current_chunk_count = len(chunk_markdown_dir(KB_DIR))
 
     try:
         backend.load()
-        if backend.expected_embedding_model() == settings.embedding_model and backend.size() > 0:
+        index_is_current = False
+        if backend_name == "numpy":
+            index_path = INDEX_PATH
+            if index_path.exists():
+                index_data = json.loads(index_path.read_text(encoding="utf-8"))
+                indexed_chunks = index_data.get("chunks", [])
+                index_is_current = (
+                    len(indexed_chunks) == current_chunk_count
+                    and bool(indexed_chunks)
+                    and all(
+                        chunk.get("chunking_version") == CHUNKING_VERSION
+                        for chunk in indexed_chunks
+                    )
+                )
+
+        if (
+            index_is_current
+            and backend.expected_embedding_model() == settings.embedding_model
+            and backend.size() > 0
+        ):
             CURRENT_BACKEND_RESULT["index"] = {
                 "status": "passed",
                 "action": "reused",
                 "size": backend.size(),
                 "embedding_model": backend.expected_embedding_model(),
+                "chunking_version": CHUNKING_VERSION,
             }
             _ok(f"复用已有索引，{backend.size()} 条向量")
             return
     except FileNotFoundError:
         pass
 
-    chunks = chunk_markdown_dir(ROOT / settings.kb_dir)
+    chunks = chunk_markdown_dir(KB_DIR)
     vectors = embedder.encode([c.text for c in chunks])
     backend.upsert(
         chunks=chunks,
@@ -184,6 +247,7 @@ def test_build_index(backend_name: str):
         "size": backend.size(),
         "embedding_model": settings.embedding_model,
         "vector_dim": len(vectors[0]),
+        "chunking_version": CHUNKING_VERSION,
     }
     _ok(f"已构建索引：{backend.size()} chunks，维度 {len(vectors[0])}")
 
@@ -197,22 +261,44 @@ def test_retriever_top_k(backend_name: str):
     retriever.load()
 
     cases = [
-        ("七天无理由退货可以吗", "退换货政策"),
-        ("钻石会员有哪些权益", "会员权益"),
-        ("偏远地区还包邮吗", "配送说明"),
-        ("忘记密码了怎么办", "常见问题FAQ"),
+        (
+            "七天无理由退货可以吗",
+            "退换货政策",
+            {"退换货政策::一、七天无理由退货::1.1 适用范围"},
+        ),
+        (
+            "钻石会员有哪些权益",
+            "会员权益",
+            {"会员权益::二、各等级核心权益::2.4 钻石会员"},
+        ),
+        (
+            "偏远地区还包邮吗",
+            "配送说明",
+            {"配送说明::三、运费规则::偏远地区与会员包邮例外"},
+        ),
+        (
+            "忘记密码了怎么办",
+            "常见问题FAQ",
+            {"常见问题FAQ::四、账户与安全::Q11：忘记密码怎么办？"},
+        ),
     ]
     retrieval_results = []
-    for query, expected_doc in cases:
+    for query, expected_doc, expected_chunks in cases:
         hits = retriever.search(query, top_k=3)
         if not hits:
             _fail(f"query={query!r} 无召回")
         top = hits[0]
         expected_in_top_k = any(h.chunk.doc == expected_doc for h in hits)
+        expected_chunk_ranks = [
+            index
+            for index, hit in enumerate(hits, start=1)
+            if hit.chunk.chunk_id in expected_chunks
+        ]
         retrieval_results.append(
             {
                 "query": query,
                 "expected_doc": expected_doc,
+                "expected_chunks": sorted(expected_chunks),
                 "top1": {
                     "chunk_id": top.chunk.chunk_id,
                     "doc": top.chunk.doc,
@@ -231,6 +317,11 @@ def test_retriever_top_k(backend_name: str):
                 ],
                 "top1_match": top.chunk.doc == expected_doc,
                 "expected_in_top_k": expected_in_top_k,
+                "expected_chunk_ranks": expected_chunk_ranks,
+                "expected_chunk_in_top_k": bool(expected_chunk_ranks),
+                "expected_chunk_top1_match": (
+                    bool(expected_chunk_ranks) and expected_chunk_ranks[0] == 1
+                ),
             }
         )
         if top.chunk.doc != expected_doc:
@@ -241,7 +332,15 @@ def test_retriever_top_k(backend_name: str):
             if not any(h.chunk.doc == expected_doc for h in hits):
                 _fail(f"Top-3 都未命中预期文档 {expected_doc}")
         else:
-            _ok(f"query={query!r} → {top.chunk.doc} / {top.chunk.section}（{top.score:.3f}）")
+            chunk_note = (
+                f"，预期 chunk 排名={expected_chunk_ranks[0]}"
+                if expected_chunk_ranks
+                else "，预期 chunk 未进 Top-3"
+            )
+            _ok(
+                f"query={query!r} → {top.chunk.doc} / {top.chunk.section}"
+                f"（{top.score:.3f}{chunk_note}）"
+            )
     CURRENT_BACKEND_RESULT["retrieval"] = {
         "status": "passed",
         "top_k": 3,
@@ -249,6 +348,7 @@ def test_retriever_top_k(backend_name: str):
     }
 
     ranks = []
+    chunk_ranks = []
     for case in retrieval_results:
         rank = next(
             (
@@ -259,6 +359,11 @@ def test_retriever_top_k(backend_name: str):
             None,
         )
         ranks.append(rank)
+        chunk_ranks.append(
+            case["expected_chunk_ranks"][0]
+            if case["expected_chunk_ranks"]
+            else None
+        )
 
     top1_scores = [case["top1"]["score"] for case in retrieval_results]
     total = len(retrieval_results)
@@ -267,11 +372,20 @@ def test_retriever_top_k(backend_name: str):
         "hit_at_1": sum(rank == 1 for rank in ranks) / total if total else 0.0,
         "hit_at_3": sum(rank is not None and rank <= 3 for rank in ranks) / total if total else 0.0,
         "mrr": sum(1 / rank for rank in ranks if rank is not None) / total if total else 0.0,
+        "chunk_hit_at_1": sum(rank == 1 for rank in chunk_ranks) / total if total else 0.0,
+        "chunk_hit_at_3": sum(
+            rank is not None and rank <= 3 for rank in chunk_ranks
+        ) / total if total else 0.0,
+        "chunk_mrr": sum(1 / rank for rank in chunk_ranks if rank is not None) / total
+        if total
+        else 0.0,
         "avg_top1_score": sum(top1_scores) / total if total else 0.0,
         "min_top1_score": min(top1_scores) if top1_scores else None,
         "max_top1_score": max(top1_scores) if top1_scores else None,
         "rank_of_expected_doc": ranks,
-        "scope": "按预期文档判断，不等同于人工标注的chunk级相关性评估",
+        "rank_of_expected_chunk": chunk_ranks,
+        "document_metrics_scope": "按预期文档判断",
+        "chunk_metrics_scope": "按测试样例中预定义的预期chunk判断，后续应迁移到独立标注数据集",
     }
 
 
@@ -349,11 +463,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend", choices=["numpy", "chroma", "all"], default="all")
     parser.add_argument(
+        "--corpus",
+        choices=["production", "evaluation"],
+        default="production",
+        help="选择正式知识库或隔离的评估知识库",
+    )
+    parser.add_argument(
         "--include-agent-e2e",
         action="store_true",
         help="额外运行 Agent 端到端测试；默认只测试 RAG 检索效果",
     )
     args = parser.parse_args()
+    _configure_paths(args.corpus)
+
+    if not KB_DIR.exists():
+        parser.error(f"知识库目录不存在: {KB_DIR}")
 
     print("=" * 60)
     print("  第 5 期 RAG · 端到端测试")
@@ -365,15 +489,16 @@ def main():
         "test": "ecom_rag",
         "started_at": started_at.isoformat(),
         "requested_backend": args.backend,
+        "corpus": args.corpus,
         "include_agent_e2e": args.include_agent_e2e,
         "configuration": {
             "embedding_backend": settings.embedding_backend,
             "embedding_model": settings.embedding_model,
             "embedding_device": settings.embedding_device,
-            "kb_dir": settings.kb_dir,
-            "kb_index_path": settings.kb_index_path,
-            "chroma_persist_dir": settings.chroma_persist_dir,
-            "chroma_collection": settings.chroma_collection,
+            "kb_dir": str(KB_DIR),
+            "kb_index_path": str(INDEX_PATH),
+            "chroma_persist_dir": str(CHROMA_PERSIST_DIR),
+            "chroma_collection": CHROMA_COLLECTION,
         },
         "backends": [],
     }

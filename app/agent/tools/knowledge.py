@@ -70,7 +70,17 @@ def search_knowledge(query: str, top_k: int = 3) -> dict:
           "backend": "numpy" | "chroma",
           "query": str,
           "results": [
-            {"doc": "...", "section": "...", "score": 0.83, "text": "..."},
+            {
+              "chunk_id": "...",
+              "doc": "...",
+              "section": "...",
+              "section_path": ["..."],
+              "parent_id": "...",
+              "source": "...",
+              "chunk_type": "...",
+              "score": 0.83,
+              "text": "..."
+            },
             ...
           ],
           "error": "..."  # 仅失败时存在
@@ -107,8 +117,13 @@ def search_knowledge(query: str, top_k: int = 3) -> dict:
         "query": query,
         "results": [
             {
+                "chunk_id": h.chunk.chunk_id,
                 "doc": h.chunk.doc,
                 "section": h.chunk.section,
+                "section_path": h.chunk.section_path,
+                "parent_id": h.chunk.parent_id,
+                "source": h.chunk.source,
+                "chunk_type": h.chunk.chunk_type,
                 "score": round(h.score, 4),
                 "text": h.chunk.text,
             }
