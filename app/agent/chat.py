@@ -1,0 +1,559 @@
+import json
+import re
+from typing import Optional
+
+from openai import OpenAI
+
+from app.agent.storage import delete_session, load_session, save_session
+from app.agent.summarizer import summarize
+from app.config.settings import settings
+from app.prompts.customer_service import SYSTEM_PROMPT
+from app.schemas.response import CustomerServiceResponse, IntentType
+from app.agent.tools.manager import ToolManager
+
+
+class EcomAgent:
+    """电商客服 Agent —— 第八期：Skill 可复用能力模块"""
+
+    def __init__(self, session_path: Optional[str] = None):
+        self.client = OpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+        )
+        self.model = settings.model_name
+        self.temperature = settings.temperature
+        self.session_path = session_path or settings.session_path
+        self.history_threshold = settings.history_threshold
+        self.history_keep_recent = settings.history_keep_recent
+        self.max_react_steps = settings.max_react_steps
+
+        self.tool_manager = ToolManager(
+            use_mcp=settings.mcp_enabled,
+            mcp_server_url=settings.mcp_server_url,
+        )
+
+        from app.agent.memory import MemoryManager
+        self.memory_manager = MemoryManager(
+            client=self.client,
+            model=self.model,
+            user_id=settings.memory_user_id,
+            memory_dir=settings.memory_dir,
+            memory_enabled=settings.memory_enabled,
+            max_ltm_facts=settings.max_ltm_facts,
+        )
+
+        if settings.memory_enabled:
+            from app.agent.tools.memory_tool import set_memory_manager
+            set_memory_manager(self.memory_manager)
+
+        from app.agent.skills import SkillManager
+        self.skill_manager = SkillManager(
+            skills_dir=settings.skills_dir,
+            enabled=settings.skills_enabled,
+        )
+        if settings.skills_enabled:
+            from app.agent.tools.skill_tool import set_skill_manager
+            set_skill_manager(self.skill_manager)
+
+        self.raw_messages: list[dict] = []
+        self.summary: Optional[str] = None
+        self._current_turn_called_tools: set[str] = set()
+        self._current_turn_extra_tools: set[str] = set()
+        self._current_turn_tools_blocked = False
+        self._current_turn_tool_results: dict[tuple[str, str], str] = {}
+        # 对外的 intent 表示用户最终目标；该字段只记录本轮最近一次工具动作，
+        # 不写入 CustomerServiceResponse，避免把“查订单”误当成“退款”等最终意图。
+        self._current_turn_action: Optional[str] = None
+
+        loaded = load_session(self.session_path)
+        if loaded:
+            self.summary = loaded["summary"]
+            self.raw_messages = loaded["messages"]
+            if loaded.get("short_term_memory"):
+                self.memory_manager.restore_stm(loaded["short_term_memory"])
+
+    @property
+    def history_size(self) -> int:
+        return len(self.raw_messages)
+
+    def chat(self, user_input: str) -> CustomerServiceResponse:
+        """处理用户输入：ReAct 循环 → 结构化提取 → 返回结果"""
+        self._current_turn_called_tools = set()
+        self._current_turn_extra_tools = set()
+        self._current_turn_tools_blocked = False
+        self._current_turn_tool_results = {}
+        self._current_turn_action = None
+        self.raw_messages.append({"role": "user", "content": user_input})
+
+        final_text = self._react_loop()
+
+        result = self._parse_final_response(final_text)
+        self.memory_manager.update_short_term(self.raw_messages[-6:])
+
+        self.raw_messages.append(
+            {"role": "assistant", "content": result.model_dump_json(ensure_ascii=False)}
+        )
+
+        if len(self.raw_messages) > self.history_threshold:
+            self._compress_history()
+
+        save_session(
+            self.session_path, self.raw_messages, self.summary,
+            short_term_memory=self.memory_manager.stm_to_dict(),
+        )
+        return result
+
+    def reset(self):
+        self.raw_messages = []
+        self.summary = None
+        self.memory_manager.reset_short_term()
+        delete_session(self.session_path)
+
+    def save(self) -> None:
+        save_session(
+            self.session_path, self.raw_messages, self.summary,
+            short_term_memory=self.memory_manager.stm_to_dict(),
+        )
+
+    def close(self):
+        self.memory_manager.consolidate_to_long_term(self.raw_messages, self.summary)
+        self.tool_manager.close()
+
+    def _react_loop(self) -> str:
+        """ReAct 循环：调用 LLM → 执行工具 → 观察结果 → 重复，直到模型给出最终回答。"""
+        for step in range(self.max_react_steps):
+            messages = self._build_messages()
+            tool_definitions = (
+                []
+                if self._current_turn_tools_blocked
+                else self._tool_definitions_for_current_turn()
+            )
+            request_kwargs = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": self.temperature,
+            }
+            if tool_definitions:
+                request_kwargs["tools"] = tool_definitions
+            else:
+                messages.append({
+                    "role": "system",
+                    "content": "当前没有可用工具，请直接根据已有信息回答，不要输出任何工具调用标记。",
+                })
+            response = self.client.chat.completions.create(**request_kwargs)
+            choice = response.choices[0]
+            assistant_msg = choice.message
+
+            if assistant_msg.content:
+                self._print_thought(assistant_msg.content)
+
+            if not assistant_msg.tool_calls:
+                content = assistant_msg.content or ""
+                assistant_record = {"role": "assistant", "content": content}
+                reasoning_content = getattr(assistant_msg, "reasoning_content", None)
+                if reasoning_content:
+                    assistant_record["reasoning_content"] = reasoning_content
+                self.raw_messages.append(assistant_record)
+                if self._contains_tool_marker(content):
+                    self._current_turn_tools_blocked = True
+                    continue
+                return content
+
+            allowed_names = {
+                definition["function"]["name"]
+                for definition in tool_definitions
+            }
+            executable_tool_calls = [
+                tc for tc in assistant_msg.tool_calls
+                if tc.function.name in allowed_names
+            ]
+            if not executable_tool_calls:
+                assistant_record = {
+                    "role": "assistant",
+                    "content": assistant_msg.content or "",
+                }
+                reasoning_content = getattr(assistant_msg, "reasoning_content", None)
+                if reasoning_content:
+                    assistant_record["reasoning_content"] = reasoning_content
+                self.raw_messages.append(assistant_record)
+                self._current_turn_tools_blocked = True
+                continue
+
+            msg_dict = {"role": "assistant", "content": assistant_msg.content}
+            reasoning_content = getattr(assistant_msg, "reasoning_content", None)
+            if reasoning_content:
+                msg_dict["reasoning_content"] = reasoning_content
+            msg_dict["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in executable_tool_calls
+            ]
+            self.raw_messages.append(msg_dict)
+
+            for tc in executable_tool_calls:
+                func_name = tc.function.name
+                func_args_json = tc.function.arguments
+                func_args = json.loads(func_args_json)
+                call_key = (func_name, func_args_json)
+                self._current_turn_action = func_name
+
+                self._print_action(func_name, func_args)
+                if call_key in self._current_turn_tool_results:
+                    # 只缓存完全相同的工具调用；不同参数或不同工具仍允许继续执行。
+                    result_str = self._current_turn_tool_results[call_key]
+                else:
+                    result_str = self.tool_manager.execute_tool(func_name, func_args)
+                    self._current_turn_tool_results[call_key] = result_str
+                self._print_observation(result_str)
+                self._current_turn_called_tools.add(func_name)
+                try:
+                    tool_result = json.loads(result_str)
+                except (TypeError, json.JSONDecodeError):
+                    tool_result = {}
+                if (
+                    func_name == "query_order"
+                    and tool_result.get("success") is False
+                ):
+                    self._current_turn_extra_tools.add("list_user_orders")
+
+                self.raw_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result_str,
+                })
+
+        messages = self._build_messages()
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature,
+        )
+        content = response.choices[0].message.content or ""
+        assistant_record = {"role": "assistant", "content": content}
+        reasoning_content = getattr(response.choices[0].message, "reasoning_content", None)
+        if reasoning_content:
+            assistant_record["reasoning_content"] = reasoning_content
+        self.raw_messages.append(assistant_record)
+        return content
+
+    @staticmethod
+    def _contains_tool_marker(content: str) -> bool:
+        return any(marker in content for marker in (
+            "DSML", "<tool_use", "<tool_result", "<｜｜",
+        ))
+
+    def _tool_definitions_for_current_turn(self) -> list[dict]:
+        """按当前请求缩小工具集合，但保留多意图和多步骤任务的工具链。"""
+        user_text = "\n".join(
+            message.get("content", "")
+            for message in self.raw_messages
+            if message.get("role") == "user"
+        )[-1200:]
+        text = user_text.lower()
+        order_id = re.search(r"ord-\d{8}-\d{3}", text, re.IGNORECASE)
+        candidates: set[str] = set()
+
+        greeting_words = ("你好", "您好", "嗨", "hello", "hi", "在吗")
+        complaint_words = ("投诉", "消协", "举报", "赔偿", "欺骗", "垃圾")
+        business_words = (
+            "物流", "快递", "运单", "到哪", "配送", "退货", "退款", "换货",
+            "退换", "商品", "库存", "价格", "多少钱", "规格", "有货", "订单",
+            "下单", "买过", "政策", "规则", "流程", "会员", "包邮", "时效",
+            "记得", "偏好", "会员信息", "以前",
+        )
+
+        # 纯问候/投诉不需要查询工具；如果同一条消息还包含业务诉求，
+        # 则继续走下面的业务路由，避免把必要的查询工具一并屏蔽。
+        pure_social = any(word in text for word in greeting_words + complaint_words)
+        has_business_request = any(word in text for word in business_words)
+        if pure_social and not has_business_request:
+            candidates = set()
+        else:
+            has_logistics = any(
+                word in text for word in ("物流", "快递", "运单", "到哪", "配送", "配送轨迹")
+            )
+            has_refund = any(word in text for word in ("退货", "退款", "换货", "退换"))
+            has_product = any(
+                word in text for word in ("商品", "库存", "价格", "多少钱", "规格", "有货")
+            )
+            has_order = any(word in text for word in ("订单", "下单", "买过"))
+            has_policy = any(
+                word in text for word in (
+                    "政策", "规则", "流程", "会员", "包邮", "时效", "支持",
+                    "能不能", "无理由", "七天", "faq",
+                )
+            )
+            has_memory = any(word in text for word in ("记得", "偏好", "会员信息", "以前"))
+
+            if has_logistics:
+                candidates.add("query_logistics" if order_id else "list_user_orders")
+
+            if has_refund:
+                confirmed = any(
+                    word in text for word in ("确认", "同意", "直接退", "马上退")
+                )
+                # 退款进度/退款状态属于查询，不应因为没有“确认退款”而没有工具。
+                if order_id:
+                    candidates.add("query_order")
+                elif not confirmed:
+                    candidates.add("list_user_orders")
+                if confirmed and order_id:
+                    candidates.add("apply_refund")
+                if has_policy:
+                    candidates.add("search_knowledge")
+
+            if has_product:
+                candidates.add("query_product")
+
+            if has_order:
+                candidates.add("query_order" if order_id else "list_user_orders")
+
+            if has_policy:
+                candidates.add("search_knowledge")
+
+            if has_memory:
+                candidates.add("recall_user_memory")
+
+            if not candidates and not pure_social:
+                candidates = {
+                    definition["function"]["name"]
+                    for definition in self.tool_manager.tool_definitions
+                }
+
+        candidates.update(self._current_turn_extra_tools)
+        return [
+            definition
+            for definition in self.tool_manager.tool_definitions
+            if definition["function"]["name"] in candidates
+        ]
+
+    def _parse_final_response(self, text: str) -> CustomerServiceResponse:
+        """直接解析最终回复，避免再发起一次结构化提取模型调用。"""
+        data = self._extract_json_object(text)
+        if data is not None:
+            model_intent = self._normalize_intent(data.get("intent"))
+            data["intent"] = self._resolve_primary_intent(
+                self._current_user_text(), model_intent
+            ).value
+            try:
+                return CustomerServiceResponse.model_validate(data)
+            except Exception:
+                pass
+        return self._local_response_fallback(text, data)
+
+    def _current_user_text(self) -> str:
+        """提取最近用户消息，供最终意图判断使用，不把工具动作当成用户目标。"""
+        return "\n".join(
+            message.get("content", "")
+            for message in self.raw_messages
+            if message.get("role") == "user"
+        )[-1200:]
+
+    def _resolve_primary_intent(
+        self,
+        user_text: str,
+        model_intent: str | None,
+    ) -> IntentType:
+        """把 intent 固定解释为用户最终目标，并纠正模型受当前动作影响的判断。
+
+        例如“我想退款，先帮我查订单”中，query_order 是当前动作，
+        return_request 才是对外返回的最终意图。这里仅做本地规则修正，
+        不增加额外的 LLM 调用。
+        """
+        text = user_text.lower()
+
+        # 投诉/举报是明确的最终目标，应优先于普通售后或订单查询。
+        if any(word in text for word in (
+            "投诉", "消协", "举报", "赔偿", "欺骗", "垃圾",
+        )):
+            return IntentType.COMPLAINT
+
+        # 退款进度、已申请退款等也是退款目标，即使当前动作只是查订单。
+        if any(word in text for word in (
+            "想退", "申请退款", "办理退款", "退掉订单", "退货退款",
+            "退款进度", "退款状态", "退款处理中", "已经申请退款",
+            "退货", "退款", "换货", "退换",
+        )):
+            return IntentType.RETURN_REQUEST
+
+        # 恢复已取消订单是 Ecom 当前不支持的售后/人工场景。
+        if any(word in text for word in (
+            "撤销取消", "恢复配送", "恢复订单", "取消后恢复",
+            "恢复已取消", "撤销已取消",
+        )):
+            return IntentType.AFTER_SALE
+
+        # 明确的订单查询动作优先于同一句中的商品词；这是当前动作和最终
+        # 目标一致时的正常情况，也能避免“订单状态和商品信息”被判成商品咨询。
+        if (
+            any(word in text for word in (
+                "列出订单", "所有订单", "订单状态", "订单详情",
+                "查询订单", "看一下订单", "查一下订单",
+            ))
+            or re.search(r"ord-\d{8}-\d{3}", text, re.I)
+        ):
+            return IntentType.ORDER_QUERY
+
+        if any(word in text for word in (
+            "商品价格", "商品库存", "商品规格", "有没有货",
+        )):
+            return IntentType.PRODUCT_CONSULT
+
+        if model_intent:
+            try:
+                return IntentType(model_intent)
+            except ValueError:
+                pass
+
+        return IntentType.OTHER
+
+    @staticmethod
+    def _extract_json_object(text: str) -> dict | None:
+        """从纯 JSON、代码块或带少量前后缀的回复中提取对象。"""
+        raw = text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        candidates = [raw]
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start >= 0 and end > start:
+            candidates.append(raw[start:end + 1])
+        for candidate in candidates:
+            try:
+                data = json.loads(candidate)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(data, dict):
+                return data
+        return None
+
+    @staticmethod
+    def _normalize_intent(value: object) -> str:
+        """兼容模型偶尔返回的中文意图标签。"""
+        if not isinstance(value, str):
+            return IntentType.OTHER.value
+        mapping = {
+            "订单查询": IntentType.ORDER_QUERY.value,
+            "退货退款": IntentType.RETURN_REQUEST.value,
+            "退货退款咨询": IntentType.RETURN_REQUEST.value,
+            "退换货": IntentType.RETURN_REQUEST.value,
+            "商品咨询": IntentType.PRODUCT_CONSULT.value,
+            "投诉": IntentType.COMPLAINT.value,
+            "售后": IntentType.AFTER_SALE.value,
+            "售后服务": IntentType.AFTER_SALE.value,
+            "优惠活动": IntentType.PROMOTION.value,
+            "账户问题": IntentType.ACCOUNT.value,
+            "问候": IntentType.GREETING.value,
+            "其他": IntentType.OTHER.value,
+        }
+        return mapping.get(value.strip(), value.strip())
+
+    def _local_response_fallback(
+        self, text: str, data: dict | None = None,
+    ) -> CustomerServiceResponse:
+        """模型未遵守 JSON 格式时，用原文和用户输入做无额外请求的兜底。"""
+        user_text = self._current_user_text()
+        intent = IntentType.OTHER
+        if data:
+            normalized = self._normalize_intent(data.get("intent"))
+            try:
+                intent = IntentType(normalized)
+            except ValueError:
+                pass
+        requires_human_hint = any(
+            word in user_text
+            for word in ("转人工", "人工客服", "人工处理", "超出能力", "无法处理")
+        )
+        intent = self._resolve_primary_intent(user_text, intent.value)
+        if (
+            intent == IntentType.OTHER
+            and any(word in user_text for word in ("你好", "您好", "嗨", "hello", "hi", "在吗"))
+        ):
+            intent = IntentType.GREETING
+        elif intent == IntentType.OTHER and any(
+            word in user_text for word in ("售后", "维修", "保修", "质量问题")
+        ):
+            intent = IntentType.AFTER_SALE
+        elif intent == IntentType.OTHER and any(
+            word in user_text for word in ("商品", "库存", "价格", "多少钱", "规格", "有货")
+        ):
+            intent = IntentType.PRODUCT_CONSULT
+        elif intent == IntentType.OTHER and any(
+            word in user_text for word in ("物流", "快递", "订单", "下单", "买过", "运单", "到哪")
+        ):
+            intent = IntentType.ORDER_QUERY
+
+        return CustomerServiceResponse(
+            intent=intent,
+            confidence=float(data.get("confidence", 0.6)) if data else 0.6,
+            reply=(data.get("reply") if data and isinstance(data.get("reply"), str) else text),
+            requires_human=(
+                bool(data.get("requires_human"))
+                if data and "requires_human" in data
+                else requires_human_hint or intent == IntentType.COMPLAINT
+            ),
+            follow_up_question=(
+                data.get("follow_up_question")
+                if data and isinstance(data.get("follow_up_question"), str)
+                else None
+            ),
+        )
+
+    def _build_messages(self) -> list[dict]:
+        system_content = SYSTEM_PROMPT
+        if self.skill_manager and self.skill_manager.enabled:
+            system_content += self.skill_manager.build_catalog_prompt()
+
+        messages: list[dict] = [
+            {"role": "system", "content": system_content}
+        ]
+        messages.extend(self.memory_manager.build_memory_prompt_sections())
+        if self.summary:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": f"以下是此前对话的摘要，用于延续上下文记忆：\n{self.summary}",
+                }
+            )
+        messages.extend(self.raw_messages)
+        return messages
+
+    def _compress_history(self) -> None:
+        keep = self.history_keep_recent
+        split = len(self.raw_messages) - keep
+        while split > 0 and self.raw_messages[split].get("role") in ("tool",):
+            split -= 1
+        if split <= 0:
+            return
+        old_messages = self.raw_messages[:split]
+        recent = self.raw_messages[split:]
+
+        new_summary = summarize(
+            client=self.client,
+            model=self.model,
+            old_messages=old_messages,
+            prev_summary=self.summary,
+        )
+        self.summary = new_summary
+        self.raw_messages = recent
+        print(
+            f"\n💾 [已压缩 {len(old_messages)} 条老消息 → summary "
+            f"({len(new_summary)} 字)]\n"
+        )
+
+    def _print_thought(self, text: str) -> None:
+        print(f"\n💭 [思考] {text}")
+
+    def _print_action(self, func_name: str, func_args: dict) -> None:
+        args_str = ", ".join(f"{k}={v!r}" for k, v in func_args.items())
+        print(f"🔧 [调用工具] {func_name}({args_str})")
+
+    def _print_observation(self, result: str) -> None:
+        display = result if len(result) <= 300 else result[:300] + "..."
+        print(f"📋 [工具结果] {display}")

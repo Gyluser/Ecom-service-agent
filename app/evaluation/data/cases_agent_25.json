@@ -1,0 +1,1001 @@
+{
+  "dataset": "Ecom Agent Tool / Workflow adapted from tau-bench Retail",
+  "source": "https://huggingface.co/datasets/HuggingFaceH4/tau2-bench-data/resolve/main/domains/retail/tasks.json",
+  "mapping_policy": "每条任务映射到当前 Ecom Mock 数据和已注册工具；不模拟 τ-bench 原始数据库状态。",
+  "cases": [
+    {
+      "id": "agent_01",
+      "description": "查询已发货订单详情",
+      "turns": [
+        "请查询订单 ORD-20240115-001 的详细信息"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "Nike",
+        "899"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_order"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "2",
+      "mapping_notes": "将 Bench 中的订单详情查询映射为 query_order。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240115-001"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240115-001"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_product_details",
+        "get_product_details",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_product_details",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_02",
+      "description": "查询已发货订单物流",
+      "turns": [
+        "订单 ORD-20240115-001 的物流到哪里了？"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "顺丰"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_logistics"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "11",
+      "mapping_notes": "将 Bench 的订单跟踪需求映射为 query_logistics。",
+      "expected_business_checks": [
+        {
+          "tool": "query_logistics",
+          "result_keywords": [
+            "success",
+            "顺丰速运"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240115-001"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_email",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "return_delivered_order_items",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_03",
+      "description": "查询未发货订单物流边界",
+      "turns": [
+        "订单 ORD-20240120-002 现在到哪里了？"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "待发货"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_logistics"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "13",
+      "mapping_notes": "保留 Bench 的物流查询意图，映射到 Ecom 的待发货订单边界。",
+      "expected_business_checks": [
+        {
+          "tool": "query_logistics",
+          "result_keywords": [
+            "尚未发货"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240120-002"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_email",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "return_delivered_order_items",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_04",
+      "description": "查询已签收订单",
+      "turns": [
+        "帮我看一下订单 ORD-20240110-003 的状态和商品"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "小米",
+        "5999"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_order"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "14",
+      "mapping_notes": "将已完成订单查询映射为 query_order。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240110-003"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240110-003"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_email",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "return_delivered_order_items",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_05",
+      "description": "查询退款处理中订单",
+      "turns": [
+        "订单 ORD-20240118-004 的退款进度怎么样了？"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": [
+        "审核中"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_order"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "19",
+      "mapping_notes": "Bench 的售后查询映射为查询退款处理中订单，不重复申请退款。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240118-004"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240118-004"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_product_details",
+        "get_product_details",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_06",
+      "description": "查询待发货订单",
+      "turns": [
+        "请查询订单 ORD-20240122-005 目前是什么状态"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "戴森",
+        "待发货"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_order"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "25",
+      "mapping_notes": "将 Bench 的订单状态确认映射为 query_order。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240122-005"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240122-005"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details"
+      ]
+    },
+    {
+      "id": "agent_07",
+      "description": "列出用户订单",
+      "turns": [
+        "我想看看我一共有哪些订单"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "ORD-20240115-001"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "list_user_orders"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "30",
+      "mapping_notes": "Bench 中先定位用户再查订单的流程，适配为 Ecom 的 list_user_orders。",
+      "expected_business_checks": [
+        {
+          "tool": "list_user_orders",
+          "result_keywords": [
+            "success",
+            "ORD-20240115-001"
+          ]
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_product_details",
+        "return_delivered_order_items",
+        "get_order_details",
+        "cancel_pending_order",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_08",
+      "description": "查询运动鞋商品",
+      "turns": [
+        "帮我查一下 Nike 运动鞋的价格和库存"
+      ],
+      "expected_intent": "product_consult",
+      "expected_keywords": [
+        "Nike",
+        "899"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_product"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "31",
+      "mapping_notes": "将 Bench 的商品详情查询映射为 query_product。",
+      "expected_business_checks": [
+        {
+          "tool": "query_product",
+          "result_keywords": [
+            "success",
+            "Nike"
+          ]
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "cancel_pending_order",
+        "get_order_details",
+        "get_order_details",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_09",
+      "description": "查询耳机商品",
+      "turns": [
+        "Apple AirPods Pro 2 有什么参数，多少钱？"
+      ],
+      "expected_intent": "product_consult",
+      "expected_keywords": [
+        "AirPods",
+        "1799"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_product"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "32",
+      "mapping_notes": "将 Bench 的商品属性查询映射为 query_product。",
+      "expected_business_checks": [
+        {
+          "tool": "query_product",
+          "result_keywords": [
+            "success",
+            "AirPods"
+          ]
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "cancel_pending_order",
+        "get_order_details",
+        "cancel_pending_order",
+        "get_order_details",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_10",
+      "description": "查询缺货牛仔裤",
+      "turns": [
+        "Levi's 501 现在还有库存吗？"
+      ],
+      "expected_intent": "product_consult",
+      "expected_keywords": [
+        "Levi",
+        "0"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_product"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "48",
+      "mapping_notes": "将 Bench 的商品可用性问题映射到 Ecom 缺货商品。",
+      "expected_business_checks": [
+        {
+          "tool": "query_product",
+          "result_keywords": [
+            "success",
+            "Levi"
+          ]
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_11",
+      "description": "查询吸尘器商品",
+      "turns": [
+        "戴森 V15 吸尘器的价格、库存和续航是多少？"
+      ],
+      "expected_intent": "product_consult",
+      "expected_keywords": [
+        "戴森",
+        "4299"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_product"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "51",
+      "mapping_notes": "将 Bench 的商品筛选需求映射为现有商品查询。",
+      "expected_business_checks": [
+        {
+          "tool": "query_product",
+          "result_keywords": [
+            "success",
+            "戴森"
+          ]
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_order_details",
+        "get_product_details",
+        "get_user_details",
+        "get_order_details",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_12",
+      "description": "查询耳机保护壳",
+      "turns": [
+        "请查一下 AirPods 保护壳的价格和适配信息"
+      ],
+      "expected_intent": "product_consult",
+      "expected_keywords": [
+        "保护壳",
+        "29.9"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_product"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "53",
+      "mapping_notes": "将 Bench 的配件查询适配到 Ecom 的商品 Mock 数据。",
+      "expected_business_checks": [
+        {
+          "tool": "query_product",
+          "result_keywords": [
+            "success",
+            "保护壳"
+          ]
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_13",
+      "description": "多轮补充订单号查询",
+      "turns": [
+        "我想查一下我的订单",
+        "订单号是 ORD-20240110-003，请告诉我买了什么"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "小米"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_order"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 9000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "54",
+      "mapping_notes": "将 Bench 的多轮订单确认改写为先表达需求、后补充 Ecom 订单号。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240110-003"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240110-003"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_email",
+        "find_user_id_by_email",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "cancel_pending_order",
+        "cancel_pending_order",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_14",
+      "description": "多轮补充物流查询",
+      "turns": [
+        "我想知道订单的配送进度",
+        "订单号是 ORD-20240115-001"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "顺丰"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_logistics"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 9000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "55",
+      "mapping_notes": "将 Bench 的物流任务适配为 Ecom 订单号补充场景。",
+      "expected_business_checks": [
+        {
+          "tool": "query_logistics",
+          "result_keywords": [
+            "success",
+            "顺丰速运"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240115-001"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_email",
+        "find_user_id_by_email",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "get_order_details",
+        "cancel_pending_order",
+        "cancel_pending_order",
+        "return_delivered_order_items",
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_15",
+      "description": "订单号不存在时列出订单",
+      "turns": [
+        "我不确定订单号，只记得想查最近买过的东西"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "订单"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "list_user_orders"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "62",
+      "mapping_notes": "Bench 中订单号不确定的场景映射为当前 Ecom 的订单列表兜底。",
+      "expected_business_checks": [
+        {
+          "tool": "list_user_orders",
+          "result_keywords": [
+            "success",
+            "ORD-"
+          ]
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "get_product_details"
+      ]
+    },
+    {
+      "id": "agent_16",
+      "description": "已签收商品退款确认",
+      "turns": [
+        "订单 ORD-20240110-003 的手机我不想要了，想申请退款",
+        "确认申请退款，原因是不想要了"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": [
+        "退款"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "apply_refund"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 9000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "65",
+      "mapping_notes": "将 Bench 的 return/exchange 分支统一适配为 Ecom 已有 apply_refund，并保留二次确认。",
+      "expected_business_checks": [
+        {
+          "tool": "apply_refund",
+          "result_keywords": [
+            "success",
+            "退款"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240110-003"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details"
+      ]
+    },
+    {
+      "id": "agent_17",
+      "description": "待发货订单取消并退款",
+      "turns": [
+        "订单 ORD-20240120-002 还没发货，我想取消并退款",
+        "确认取消订单，原因是下单错误"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": [
+        "取消",
+        "退款"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "apply_refund"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 9000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "66",
+      "mapping_notes": "将 Bench 的 cancel_pending_order 映射为 Ecom 对待发货订单调用 apply_refund。",
+      "expected_business_checks": [
+        {
+          "tool": "apply_refund",
+          "result_keywords": [
+            "success",
+            "直接取消"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240120-002"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "cancel_pending_order"
+      ]
+    },
+    {
+      "id": "agent_18",
+      "description": "已签收订单售后申请",
+      "turns": [
+        "我收到的订单 ORD-20240110-003 有问题，想退货退款",
+        "确认提交，原因是商品不符合预期"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": [
+        "退款申请"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "apply_refund"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 9000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "67",
+      "mapping_notes": "将 Bench 的退货流程映射为 Ecom 已有退款申请流程。",
+      "expected_business_checks": [
+        {
+          "tool": "apply_refund",
+          "result_keywords": [
+            "success",
+            "退款申请已提交"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240110-003"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "find_user_id_by_name_zip",
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details"
+      ]
+    },
+    {
+      "id": "agent_19",
+      "description": "退款处理中不重复操作",
+      "turns": [
+        "订单 ORD-20240118-004 已经申请退款了，我只想确认当前进度"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": [
+        "审核中"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_order"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "68",
+      "mapping_notes": "针对 Ecom 已有退款处理中状态，禁止重复调用退款工具。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240118-004"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240118-004"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details"
+      ]
+    },
+    {
+      "id": "agent_20",
+      "description": "商品咨询后查询订单",
+      "turns": [
+        "我之前买过 AirPods，先帮我确认一下这个商品",
+        "订单号是 ORD-20240120-002，顺便看看订单状态"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "AirPods",
+        "待发货"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_order"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 9000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "69",
+      "mapping_notes": "商品查询是可选辅助步骤，不再强制要求 query_product；只校验最终订单查询和订单结果，允许 Agent 采用列订单后查详情等等价路径。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240120-002"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240120-002"
+          }
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_name_zip",
+        "get_user_details",
+        "get_order_details",
+        "cancel_pending_order"
+      ]
+    },
+    {
+      "id": "agent_21",
+      "description": "查询全部订单后确认退款对象",
+      "turns": [
+        "我不知道具体订单号，先列出我的订单",
+        "我要处理其中的订单 ORD-20240118-004，先告诉我退款状态"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": [
+        "审核中"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "list_user_orders",
+        "query_order"
+      ],
+      "min_tool_calls": 2,
+      "max_tokens": 9000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "73",
+      "mapping_notes": "将 Bench 的先定位用户订单再处理售后的流程适配为列表加详情查询。",
+      "expected_business_checks": [
+        {
+          "tool": "list_user_orders",
+          "result_keywords": [
+            "success",
+            "ORD-20240118-004"
+          ]
+        },
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240118-004"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240118-004"
+          }
+        }
+      ],
+      "source_actions": [
+        "return_delivered_order_items"
+      ]
+    },
+    {
+      "id": "agent_22",
+      "description": "退款前查询订单详情",
+      "turns": [
+        "我想退掉订单 ORD-20240122-005 的吸尘器，先帮我确认订单状态"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": [
+        "戴森"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "query_order"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "81",
+      "mapping_notes": "Bench 的取消前确认步骤适配为先查询订单，敏感退款操作留给确认后的下一轮。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": [
+            "success",
+            "ORD-20240122-005"
+          ],
+          "arguments": {
+            "order_id": "ORD-20240122-005"
+          }
+        }
+      ],
+      "source_actions": [
+        "cancel_pending_order",
+        "cancel_pending_order"
+      ]
+    },
+    {
+      "id": "agent_23",
+      "description": "复杂退款支付方式超出能力边界转人工",
+      "turns": [
+        "我有两笔订单，想把退款分别退到另一张支付方式；如果系统不能处理，请帮我转人工客服"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": [
+        "退款"
+      ],
+      "expected_requires_human": true,
+      "expected_tools": [
+        "list_user_orders"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "10",
+      "mapping_notes": "保留 Bench 的跨支付方式退款场景；Ecom 没有支付方式切换工具，因此先列出订单并要求人工介入。",
+      "expected_business_checks": [
+        {
+          "tool": "list_user_orders",
+          "result_keywords": [
+            "success",
+            "ORD-"
+          ]
+        }
+      ],
+      "source_actions": [
+        "find_user_id_by_email",
+        "get_user_details",
+        "get_order_details",
+        "get_order_details",
+        "transfer_to_human_agents"
+      ]
+    },
+    {
+      "id": "agent_24",
+      "description": "撤销已取消订单转人工",
+      "turns": [
+        "我想撤销之前已经取消的订单，让它尽快恢复配送；如果不能直接处理，请转人工"
+      ],
+      "expected_intent": "after_sale",
+      "expected_keywords": [
+        "人工"
+      ],
+      "expected_requires_human": true,
+      "expected_tools": [],
+      "min_tool_calls": 0,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "50",
+      "mapping_notes": "保留 Bench 的撤销订单场景；Ecom 没有恢复已取消订单的工具，只校验人工转接判断。",
+      "expected_business_checks": [],
+      "source_actions": [
+        "transfer_to_human_agents"
+      ]
+    },
+    {
+      "id": "agent_25",
+      "description": "没有订单号时列出全部订单",
+      "turns": [
+        "请把我所有订单列出来，我想确认哪个订单需要售后"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": [
+        "ORD-20240115-001"
+      ],
+      "expected_requires_human": false,
+      "expected_tools": [
+        "list_user_orders"
+      ],
+      "min_tool_calls": 1,
+      "max_tokens": 6000,
+      "category": "agent_tool_workflow",
+      "source_task_id": "113",
+      "mapping_notes": "将 Bench 的多订单处理入口映射到 Ecom 的 list_user_orders。",
+      "expected_business_checks": [
+        {
+          "tool": "list_user_orders",
+          "result_keywords": [
+            "success",
+            "ORD-20240115-001"
+          ]
+        }
+      ],
+      "source_actions": [
+        "cancel_pending_order",
+        "cancel_pending_order"
+      ]
+    }
+  ]
+}
