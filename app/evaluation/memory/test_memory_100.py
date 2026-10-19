@@ -19,6 +19,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 DATASET = ROOT / "app" / "evaluation" / "data" / "cases_memory_100.json"
 RESULT_DIR = ROOT / "app" / "evaluation" / "memory" / "result"
+EXPECTED_RECORDS_PER_CASE = 18
 sys.path.insert(0, str(ROOT))
 
 if "openai" not in sys.modules:
@@ -50,8 +51,10 @@ def _load_dataset() -> dict[str, Any]:
     actual_counts = defaultdict(int)
     for case in cases:
         actual_counts[case.get("category", "")] += 1
-        if len(case.get("memory_records", [])) != 10:
-            raise ValueError(f"{case.get('case_id')} 必须包含 10 条 Memory 记录")
+        if len(case.get("memory_records", [])) != EXPECTED_RECORDS_PER_CASE:
+            raise ValueError(
+                f"{case.get('case_id')} 必须包含 {EXPECTED_RECORDS_PER_CASE} 条 Memory 记录"
+            )
     if dict(actual_counts) != required_counts:
         raise ValueError(f"类别数量不符合要求: {dict(actual_counts)}")
     return data
@@ -107,6 +110,48 @@ def _answer_evidence(prompt: str, case: dict[str, Any]) -> float | None:
         all(keyword.lower() in normalized for keyword in required)
         and all(keyword.lower() not in normalized for keyword in forbidden)
     )
+
+
+def _baseline_case_metrics(case: dict[str, Any]) -> dict[str, float]:
+    """Emulate the old full-file-order injection on the same final dataset."""
+    retrieved_ids = [record["memory_id"] for record in case["memory_records"]]
+    relevant_ids = case["relevant_memory_ids"]
+    if not relevant_ids:
+        metrics = {
+            "no_relevant_avoidance": 0.0,
+            "returned_count": float(len(retrieved_ids)),
+        }
+        metrics["cross_session_persistence"] = 1.0
+        if case["category"] == "user_isolation":
+            metrics["user_isolation_rate"] = 1.0
+        if case["category"] == "process_restart_persistence":
+            metrics["process_restart_persistence"] = 1.0
+        return metrics
+    metrics = _retrieval_metrics(retrieved_ids, relevant_ids)
+    if case.get("answer_accuracy_evaluable", False):
+        prompt = "\n".join(record["content"] for record in case["memory_records"])
+        answer = _answer_evidence(prompt, case)
+        if answer is not None:
+            metrics["answer_accuracy"] = answer
+    update = case.get("update_expectation")
+    if update:
+        content_by_id = {
+            record["memory_id"]: record["content"]
+            for record in case["memory_records"]
+        }
+        actual = set(content_by_id.values())
+        latest = content_by_id[update["latest_memory_id"]]
+        stale = {
+            content_by_id[memory_id]
+            for memory_id in update.get("stale_memory_ids", [])
+        }
+        metrics["update_accuracy"] = float(latest in actual and not stale.intersection(actual))
+    metrics["cross_session_persistence"] = 1.0
+    if case["category"] == "user_isolation":
+        metrics["user_isolation_rate"] = 1.0
+    if case["category"] == "process_restart_persistence":
+        metrics["process_restart_persistence"] = 1.0
+    return metrics
 
 
 def _restart_check(memory_dir: Path, user_id: str, expected: set[str]) -> bool:
@@ -192,6 +237,8 @@ def _case_result(case: dict[str, Any], memory_dir: Path) -> dict[str, Any]:
             _restart_check(memory_dir, user_id, expected_contents)
         )
 
+    baseline_metrics = _baseline_case_metrics(case)
+
     result: dict[str, Any] = {
         "case_id": case["case_id"],
         "category": case["category"],
@@ -204,6 +251,12 @@ def _case_result(case: dict[str, Any], memory_dir: Path) -> dict[str, Any]:
         ],
         "relevant_memory_ids": relevant_ids,
         "metrics": metrics,
+        "baseline": {
+            "retrieved_memory_ids": [
+                record["memory_id"] for record in records
+            ],
+            "metrics": baseline_metrics,
+        },
         "prompt_fact_count": len(memory.facts),
         "reloaded_fact_count": len(reloaded.facts),
         "source_bench": case.get("source_bench", {}),
@@ -235,6 +288,15 @@ def _mean(results: list[dict[str, Any]], metric: str) -> float:
     return round(sum(values) / len(values), 4) if values else 0.0
 
 
+def _mean_baseline(results: list[dict[str, Any]], metric: str) -> float:
+    values = [
+        case["baseline"]["metrics"][metric]
+        for case in results
+        if metric in case["baseline"]["metrics"]
+    ]
+    return round(sum(values) / len(values), 4) if values else 0.0
+
+
 def main() -> Path:
     dataset = _load_dataset()
     case_results: list[dict[str, Any]] = []
@@ -263,7 +325,12 @@ def main() -> Path:
         metric: _mean(case_results, metric)
         for metric in metric_names
     }
+    baseline_summary_metrics = {
+        metric: _mean_baseline(case_results, metric)
+        for metric in metric_names
+    }
     category_metrics: dict[str, dict[str, float]] = {}
+    baseline_category_metrics: dict[str, dict[str, float]] = {}
     categories = sorted({case["category"] for case in case_results})
     for category in categories:
         category_cases = [case for case in case_results if case["category"] == category]
@@ -272,19 +339,27 @@ def main() -> Path:
             for metric in metric_names
             if any(metric in case["metrics"] for case in category_cases)
         }
+        baseline_category_metrics[category] = {
+            metric: _mean_baseline(category_cases, metric)
+            for metric in metric_names
+            if any(metric in case["baseline"]["metrics"] for case in category_cases)
+        }
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = RESULT_DIR / f"memory_100_{timestamp}.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output = {
-        "schema_version": "memory_100_result_v1",
+        "schema_version": "memory_100_result_v2",
         "evaluation_mode": "memory_only",
         "retrieval_behavior": "query_aware_top_k_local_retriever",
         "dataset": str(DATASET),
         "case_count": len(case_results),
         "repeat_count": 1,
         "metrics": summary_metrics,
+        "baseline_behavior": "full_file_order_injection_on_same_final_dataset",
+        "baseline_metrics": baseline_summary_metrics,
         "category_metrics": category_metrics,
+        "baseline_category_metrics": baseline_category_metrics,
         "cases": case_results,
     }
     output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
