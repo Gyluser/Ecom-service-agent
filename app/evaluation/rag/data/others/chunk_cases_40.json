@@ -1,0 +1,475 @@
+{
+  "dataset": "Ecom RAG chunk-level retrieval evaluation",
+  "description": "基于评估知识库生成的 40 条可回答 Retriever 测试用例。只评估 chunk 检索，不调用 Agent 循环。",
+  "source_policy": "测试问题和 gold_evidence 均依据当前 rag_knowledge 文档生成；运行时以当前 chunker 产生的 chunk 为匹配单位。",
+  "metrics_scope": "answerable-only Precision@1/3/5、Recall@1/3/5、F1@1/3/5、MRR@5、MAP@5",
+  "cases": [
+    {
+      "id": "orig_direct_001",
+      "source_scope": "original",
+      "query": "普通现货商品通常承诺多久发货？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["常见问题FAQ"],
+      "gold_evidence": [{"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "一、订单与支付", "Q1：下单后多久发货？"], "text_anchor": "48 小时内出库", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问现货发货时限"
+    },
+    {
+      "id": "orig_direct_002",
+      "source_scope": "original",
+      "query": "平台支持微信、支付宝和哪些支付方式？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["常见问题FAQ"],
+      "gold_evidence": [{"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "一、订单与支付", "Q2：支持哪些支付方式？"], "text_anchor": "微信支付", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问支付方式"
+    },
+    {
+      "id": "orig_direct_003",
+      "source_scope": "original",
+      "query": "白银会员的退换货上门取件费有什么优惠？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "二、各等级核心权益", "2.2 白银会员"], "text_anchor": "减免 50%", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问白银会员权益"
+    },
+    {
+      "id": "orig_direct_004",
+      "source_scope": "original",
+      "query": "钻石会员需要达到多少累计实付金额？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "一、会员等级体系"], "text_anchor": "钻石会员 | 累计 20,000 元", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问会员等级门槛"
+    },
+    {
+      "id": "orig_direct_005",
+      "source_scope": "original",
+      "query": "积分从获得之日起多久过期？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "三、积分体系"], "text_anchor": "24 个月有效", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问积分有效期"
+    },
+    {
+      "id": "orig_direct_006",
+      "source_scope": "original",
+      "query": "订单满多少钱可以免基础运费？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["配送说明"],
+      "gold_evidence": [{"doc": "配送说明", "section_path": ["并夕夕 配送说明", "三、运费规则", "普通包邮规则"], "text_anchor": "满 99 元包邮", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问普通包邮门槛"
+    },
+    {
+      "id": "orig_direct_007",
+      "source_scope": "original",
+      "query": "七天无理由退货需要满足什么条件？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["退换货政策"],
+      "gold_evidence": [{"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "一、七天无理由退货", "1.1 适用范围"], "text_anchor": "签收商品之日起 7 天内", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问七天无理由退货条件"
+    },
+    {
+      "id": "orig_direct_008",
+      "source_scope": "original",
+      "query": "退款申请提交后需要经过哪些步骤？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["退换货政策"],
+      "gold_evidence": [{"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "三、退款流程"], "text_anchor": "申请退款", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问退款流程"
+    },
+    {
+      "id": "orig_paraphrase_001",
+      "source_scope": "original",
+      "query": "商品页面没货时，怎样才能收到补货提醒？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["常见问题FAQ"],
+      "gold_evidence": [{"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "二、商品与价格", "Q6：商品页缺货怎么办？"], "text_anchor": "到货提醒", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "对缺货提醒问题进行口语化改写"
+    },
+    {
+      "id": "orig_paraphrase_002",
+      "source_scope": "original",
+      "query": "不同支付渠道的退款到账时间一样吗？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["常见问题FAQ"],
+      "gold_evidence": [{"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "三、售后服务", "Q9：退款多久到账？"], "text_anchor": "1-3 个工作日", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "对退款时效问题进行改写"
+    },
+    {
+      "id": "orig_paraphrase_003",
+      "source_scope": "original",
+      "query": "账号疑似被别人登录并发生了非本人交易，该先怎么处理？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["常见问题FAQ"],
+      "gold_evidence": [{"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "四、账户与安全", "Q12：账户被盗如何处理？"], "text_anchor": "解绑支付方式", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "口语化描述账户被盗"
+    },
+    {
+      "id": "orig_paraphrase_004",
+      "source_scope": "original",
+      "query": "黄金会员平时能享受哪些核心服务？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "二、各等级核心权益", "2.3 黄金会员"], "text_anchor": "全场免邮", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "对黄金会员权益的概括性改写"
+    },
+    {
+      "id": "orig_paraphrase_005",
+      "source_scope": "original",
+      "query": "钻石会员的无忧退一年能用几次？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "二、各等级核心权益", "2.4 钻石会员"], "text_anchor": "一年 4 次", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "改写钻石会员无忧退权益"
+    },
+    {
+      "id": "orig_paraphrase_006",
+      "source_scope": "original",
+      "query": "快递轨迹连续几天不更新时，平台能帮忙催件吗？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["配送说明"],
+      "gold_evidence": [{"doc": "配送说明", "section_path": ["并夕夕 配送说明", "六、配送异常"], "text_anchor": "超过 3 天未更新轨迹", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "改写物流停滞处理规则"
+    },
+    {
+      "id": "orig_paraphrase_007",
+      "source_scope": "original",
+      "query": "七天无理由退货的寄回运费是由谁支付？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["退换货政策"],
+      "gold_evidence": [{"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "一、七天无理由退货", "1.3 运费规则"], "text_anchor": "顾客承担退货运费", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "改写七天无理由退货运费规则"
+    },
+    {
+      "id": "orig_paraphrase_008",
+      "source_scope": "original",
+      "query": "多件订单可以只退其中一件吗？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["退换货政策"],
+      "gold_evidence": [{"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "四、特殊场景", "4.3 部分退款"], "text_anchor": "只退其中一件或几件", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "改写部分退款场景"
+    },
+    {
+      "id": "orig_ambiguous_001",
+      "source_scope": "original",
+      "query": "订单地址还能改吗？",
+      "query_type": ["ambiguous"],
+      "answerable": true,
+      "expected_docs": ["常见问题FAQ"],
+      "gold_evidence": [{"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "一、订单与支付", "Q3：能否修改订单信息？"], "text_anchor": "未发货", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "问题未说明订单是否已经发货"
+    },
+    {
+      "id": "orig_ambiguous_002",
+      "source_scope": "original",
+      "query": "会员生日时能拿到什么优惠？",
+      "query_type": ["ambiguous"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "四、生日特权"], "text_anchor": "生日当天", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "问题未指定会员等级和生日时间范围"
+    },
+    {
+      "id": "orig_ambiguous_003",
+      "source_scope": "original",
+      "query": "县城配送一般要多久？",
+      "query_type": ["ambiguous"],
+      "answerable": true,
+      "expected_docs": ["配送说明"],
+      "gold_evidence": [{"doc": "配送说明", "section_path": ["并夕夕 配送说明", "二、配送时效"], "text_anchor": "县级及以下", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "问题未指定普通快递或特殊时效"
+    },
+    {
+      "id": "orig_ambiguous_004",
+      "source_scope": "original",
+      "query": "商品有质量问题，退换货怎么规定？",
+      "query_type": ["ambiguous"],
+      "answerable": true,
+      "expected_docs": ["退换货政策"],
+      "gold_evidence": [
+        {"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "二、质量问题退换货", "2.1 适用情形"], "text_anchor": "功能性故障", "relevance": 2, "required": true},
+        {"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "二、质量问题退换货", "2.2 时效与运费"], "text_anchor": "签收后 15 天内", "relevance": 2, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "需要同时判断适用情形、时效和运费"
+    },
+    {
+      "id": "orig_ambiguous_005",
+      "source_scope": "original",
+      "query": "华为产品还能不能免费修？",
+      "query_type": ["ambiguous"],
+      "answerable": true,
+      "expected_docs": ["华为硬件保修条款"],
+      "gold_evidence": [
+        {"doc": "华为硬件保修条款", "section_path": ["华为硬件保修条款（评估语料）", "中国区保修政策"], "text_anchor": "三包有效期", "relevance": 1, "required": true},
+        {"doc": "华为硬件保修条款", "section_path": ["华为硬件保修条款（评估语料）", "不承担三包责任的常见情况"], "text_anchor": "私自拆机", "relevance": 2, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "问题未说明保修状态和损坏原因"
+    },
+    {
+      "id": "orig_hard_negative_001",
+      "source_scope": "original",
+      "query": "付款成功但平台订单状态没有更新，该怎么办？",
+      "query_type": ["hard_negative"],
+      "answerable": true,
+      "expected_docs": ["常见问题FAQ"],
+      "gold_evidence": [{"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "一、订单与支付", "Q4：订单显示「已支付」但平台未识别怎么办？"], "text_anchor": "超过 30 分钟仍未同步", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "容易与支付方式问题混淆"
+    },
+    {
+      "id": "orig_hard_negative_002",
+      "source_scope": "original",
+      "query": "黄金会员在偏远地区也一定免邮吗？",
+      "query_type": ["hard_negative"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "二、各等级核心权益", "2.3 黄金会员"], "text_anchor": "不含偏远地区", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "容易误召回钻石会员包邮权益"
+    },
+    {
+      "id": "orig_hard_negative_003",
+      "source_scope": "original",
+      "query": "偏远地区的订单是否仍然参加全场包邮？",
+      "query_type": ["hard_negative"],
+      "answerable": true,
+      "expected_docs": ["配送说明"],
+      "gold_evidence": [{"doc": "配送说明", "section_path": ["并夕夕 配送说明", "三、运费规则", "偏远地区与会员包邮例外"], "text_anchor": "不参与全场包邮", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "容易与钻石会员包邮规则混淆"
+    },
+    {
+      "id": "orig_hard_negative_004",
+      "source_scope": "original",
+      "query": "退货产生的运费是不是平台承担？",
+      "query_type": ["hard_negative"],
+      "answerable": true,
+      "expected_docs": ["退换货政策"],
+      "gold_evidence": [{"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "一、七天无理由退货", "1.3 运费规则"], "text_anchor": "顾客承担退货运费", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "容易误召回质量问题退换货的运费规则"
+    },
+    {
+      "id": "orig_hard_negative_005",
+      "source_scope": "original",
+      "query": "生日当天可以领取哪一张券？",
+      "query_type": ["hard_negative"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "四、生日特权"], "text_anchor": "88 元无门槛券", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "容易误召回注册会员生日折扣券"
+    },
+    {
+      "id": "orig_multi_001",
+      "source_scope": "original",
+      "query": "钻石会员在偏远地区买东西是否还要付运费？",
+      "query_type": ["multi_chunk"],
+      "answerable": true,
+      "expected_docs": ["会员权益", "配送说明"],
+      "gold_evidence": [
+        {"doc": "会员权益", "section_path": ["并夕夕 会员权益", "二、各等级核心权益", "2.4 钻石会员"], "text_anchor": "全场包邮（含偏远地区）", "relevance": 2, "required": true},
+        {"doc": "配送说明", "section_path": ["并夕夕 配送说明", "三、运费规则", "偏远地区与会员包邮例外"], "text_anchor": "偏远地区", "relevance": 1, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "需要结合会员等级和偏远地区运费规则"
+    },
+    {
+      "id": "orig_multi_002",
+      "source_scope": "original",
+      "query": "黄金会员在新疆等偏远地区能否免邮？",
+      "query_type": ["multi_chunk"],
+      "answerable": true,
+      "expected_docs": ["会员权益", "配送说明"],
+      "gold_evidence": [
+        {"doc": "会员权益", "section_path": ["并夕夕 会员权益", "二、各等级核心权益", "2.3 黄金会员"], "text_anchor": "不含偏远地区", "relevance": 2, "required": true},
+        {"doc": "配送说明", "section_path": ["并夕夕 配送说明", "三、运费规则", "偏远地区与会员包邮例外"], "text_anchor": "新疆、西藏、青海", "relevance": 1, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "需要结合黄金会员例外和偏远地区规则"
+    },
+    {
+      "id": "orig_multi_003",
+      "source_scope": "original",
+      "query": "质量问题退换货需要准备什么材料，并且要在多久内申请？",
+      "query_type": ["multi_chunk"],
+      "answerable": true,
+      "expected_docs": ["退换货政策"],
+      "gold_evidence": [
+        {"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "二、质量问题退换货", "2.2 时效与运费"], "text_anchor": "签收后 15 天内", "relevance": 2, "required": true},
+        {"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "二、质量问题退换货", "2.3 举证材料"], "text_anchor": "故障演示视频", "relevance": 2, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "需要同时检索质量问题时效和举证材料"
+    },
+    {
+      "id": "orig_multi_004",
+      "source_scope": "original",
+      "query": "退款成功会不会影响会员升级金额，退款又要多久到账？",
+      "query_type": ["multi_chunk"],
+      "answerable": true,
+      "expected_docs": ["会员权益", "常见问题FAQ"],
+      "gold_evidence": [
+        {"doc": "会员权益", "section_path": ["并夕夕 会员权益", "五、常见问题", "退款是否会扣减升级所需金额？"], "text_anchor": "消费金额从累计中扣除", "relevance": 2, "required": true},
+        {"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "三、售后服务", "Q9：退款多久到账？"], "text_anchor": "银行卡", "relevance": 2, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "需要结合会员累计金额和不同支付渠道到账时间"
+    },
+    {
+      "id": "orig_multi_005",
+      "source_scope": "original",
+      "query": "订单还没发货时可以仅退款吗，微信和银行卡分别多久到账？",
+      "query_type": ["multi_chunk"],
+      "answerable": true,
+      "expected_docs": ["退换货政策", "常见问题FAQ"],
+      "gold_evidence": [
+        {"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "四、特殊场景", "4.1 仅退款（不退货）"], "text_anchor": "商品未发货", "relevance": 2, "required": true},
+        {"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "三、售后服务", "Q9：退款多久到账？"], "text_anchor": "微信/支付宝", "relevance": 2, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "需要结合仅退款适用场景和支付渠道到账时间"
+    },
+    {
+      "id": "orig_multi_006",
+      "source_scope": "original",
+      "query": "黄金会员退换货上门取件免费吗，质量问题的退货运费又由谁承担？",
+      "query_type": ["multi_chunk"],
+      "answerable": true,
+      "expected_docs": ["会员权益", "退换货政策"],
+      "gold_evidence": [
+        {"doc": "会员权益", "section_path": ["并夕夕 会员权益", "二、各等级核心权益", "2.3 黄金会员"], "text_anchor": "退换货上门取件免费", "relevance": 2, "required": true},
+        {"doc": "退换货政策", "section_path": ["并夕夕 退换货政策", "二、质量问题退换货", "2.2 时效与运费"], "text_anchor": "运费由「并夕夕」承担", "relevance": 2, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "需要区分会员取件权益和质量问题运费规则"
+    },
+    {
+      "id": "orig_entity_001",
+      "source_scope": "original",
+      "query": "可以使用 Apple Pay 付款吗？",
+      "query_type": ["entity"],
+      "answerable": true,
+      "expected_docs": ["常见问题FAQ"],
+      "gold_evidence": [{"doc": "常见问题FAQ", "section_path": ["并夕夕 常见问题 FAQ", "一、订单与支付", "Q2：支持哪些支付方式？"], "text_anchor": "Apple Pay", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "实体为具体支付方式"
+    },
+    {
+      "id": "orig_entity_002",
+      "source_scope": "original",
+      "query": "钻石会员一年有几次无忧退？",
+      "query_type": ["entity"],
+      "answerable": true,
+      "expected_docs": ["会员权益"],
+      "gold_evidence": [{"doc": "会员权益", "section_path": ["并夕夕 会员权益", "二、各等级核心权益", "2.4 钻石会员"], "text_anchor": "一年 4 次「无忧退」", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "实体为钻石会员的具体权益"
+    },
+    {
+      "id": "orig_entity_003",
+      "source_scope": "original",
+      "query": "平台合作的快递公司有哪些？",
+      "query_type": ["entity"],
+      "answerable": true,
+      "expected_docs": ["配送说明"],
+      "gold_evidence": [{"doc": "配送说明", "section_path": ["并夕夕 配送说明", "四、合作快递"], "text_anchor": "顺丰速运", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "实体为合作快递公司集合"
+    },
+    {
+      "id": "new_entity_001",
+      "source_scope": "new",
+      "query": "型号代码 MDG 对应哪些华为笔记本？",
+      "query_type": ["entity"],
+      "answerable": true,
+      "expected_docs": ["华为笔记本_SuperTurbo_支持机型清单"],
+      "gold_evidence": [
+        {"doc": "华为笔记本_SuperTurbo_支持机型清单", "section_path": ["华为笔记本 SuperTurbo 支持机型清单（评估语料）", "SuperTurbo 2.0/3.0 支持机型"], "text_anchor": "MDG", "relevance": 2, "required": true},
+        {"doc": "华为笔记本_SuperTurbo_支持机型清单", "section_path": ["华为笔记本 SuperTurbo 支持机型清单（评估语料）", "SuperTurbo 1.0 支持机型"], "text_anchor": "MDG", "relevance": 2, "required": true}
+      ],
+      "requires_multi_chunk": true,
+      "notes": "同一型号代码出现在两个版本清单中"
+    },
+    {
+      "id": "new_entity_002",
+      "source_scope": "new",
+      "query": "MateBook GT 14 的机身型号和 SuperTurbo 版本是什么？",
+      "query_type": ["entity"],
+      "answerable": true,
+      "expected_docs": ["华为笔记本_SuperTurbo_支持机型清单"],
+      "gold_evidence": [{"doc": "华为笔记本_SuperTurbo_支持机型清单", "section_path": ["华为笔记本 SuperTurbo 支持机型清单（评估语料）", "SuperTurbo 2.0/3.0 支持机型"], "text_anchor": "MateBook GT 14", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "实体为具体华为笔记本型号"
+    },
+    {
+      "id": "new_paraphrase_001",
+      "source_scope": "new",
+      "query": "自己拆开华为设备导致损坏，还能享受免费三包维修吗？",
+      "query_type": ["paraphrase"],
+      "answerable": true,
+      "expected_docs": ["华为硬件保修条款"],
+      "gold_evidence": [{"doc": "华为硬件保修条款", "section_path": ["华为硬件保修条款（评估语料）", "不承担三包责任的常见情况"], "text_anchor": "私自拆机", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "改写私自拆机责任条款"
+    },
+    {
+      "id": "new_direct_001",
+      "source_scope": "new",
+      "query": "华为维修通常需要提供哪些凭证？",
+      "query_type": ["direct"],
+      "answerable": true,
+      "expected_docs": ["华为硬件保修条款"],
+      "gold_evidence": [{"doc": "华为硬件保修条款", "section_path": ["华为硬件保修条款（评估语料）", "中国区保修政策"], "text_anchor": "发票、三包凭证", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "直接询问维修凭证"
+    },
+    {
+      "id": "new_ambiguous_001",
+      "source_scope": "new",
+      "query": "华为笔记本进水后还能免费保修吗？",
+      "query_type": ["ambiguous"],
+      "answerable": true,
+      "expected_docs": ["华为硬件保修条款"],
+      "gold_evidence": [{"doc": "华为硬件保修条款", "section_path": ["华为硬件保修条款（评估语料）", "不承担三包责任的常见情况"], "text_anchor": "进液、淋湿", "relevance": 2, "required": true}],
+      "requires_multi_chunk": false,
+      "notes": "问题未说明进水原因和是否造成损坏"
+    }
+  ]
+}
