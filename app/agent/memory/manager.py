@@ -28,6 +28,7 @@ class MemoryManager:
         self.client = client
         self.model = model
         self.memory_enabled = memory_enabled
+        self.last_retrieval: list[dict] = []
 
         self.stm = ShortTermMemory()
         self.ltm = LongTermMemory(
@@ -45,19 +46,52 @@ class MemoryManager:
             return
         self.stm.update(self.client, self.model, recent_messages)
 
-    def build_memory_prompt_sections(self) -> list[dict]:
+    def build_memory_prompt_sections(self, query: str = "", top_k: int = 10) -> list[dict]:
         """生成所有记忆相关的 system prompt 消息列表。"""
         if not self.memory_enabled:
             return []
 
         sections = []
-        ltm_section = self.ltm.build_prompt_section()
+        matches = self.ltm.retrieve(query, top_k=top_k)
+        self.last_retrieval = [
+            {
+                "memory_id": match.fact.memory_id,
+                "score": match.score,
+                "rank": match.rank,
+            }
+            for match in matches
+        ]
+        ltm_section = self.ltm.build_prompt_section_for_query(query, top_k=top_k)
         if ltm_section:
             sections.append({"role": "system", "content": ltm_section})
         stm_section = self.stm.build_prompt_section()
         if stm_section:
             sections.append({"role": "system", "content": stm_section})
         return sections
+
+    def recall(self, query: str = "", top_k: int = 10) -> list[dict]:
+        """返回带排序证据的长期记忆结果。"""
+        matches = self.ltm.retrieve(query, top_k=top_k)
+        self.last_retrieval = [
+            {"memory_id": match.fact.memory_id, "score": match.score, "rank": match.rank}
+            for match in matches
+        ]
+        return [
+            {
+                "memory_id": match.fact.memory_id,
+                "user_id": match.fact.user_id,
+                "content": match.fact.content,
+                "category": match.fact.category,
+                "key": match.fact.key,
+                "created_at": match.fact.created_at,
+                "updated_at": match.fact.updated_at,
+                "version": match.fact.version,
+                "status": match.fact.status,
+                "score": match.score,
+                "rank": match.rank,
+            }
+            for match in matches
+        ]
 
     def consolidate_to_long_term(
         self, messages: list[dict], summary: Optional[str],

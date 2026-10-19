@@ -143,7 +143,19 @@ class MultiAgentOrchestrator:
         messages: list[dict] = [
             {"role": "system", "content": system_content}
         ]
-        messages.extend(self.memory_manager.build_memory_prompt_sections())
+        latest_user_message = next(
+            (
+                message.get("content", "")
+                for message in reversed(self.raw_messages)
+                if message.get("role") == "user"
+            ),
+            "",
+        )
+        messages.extend(
+            self.memory_manager.build_memory_prompt_sections(
+                query=latest_user_message,
+            )
+        )
         if self.summary:
             messages.append({
                 "role": "system",

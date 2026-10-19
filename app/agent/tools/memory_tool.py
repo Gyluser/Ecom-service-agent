@@ -21,13 +21,13 @@ def recall_user_memory(query: str = "") -> dict:
     if _memory_manager is None or not _memory_manager.memory_enabled:
         return {"success": False, "error": "记忆系统未启用"}
 
+    long_term_facts = _memory_manager.recall(query)
     result: dict = {
         "success": True,
         "short_term_facts": _memory_manager.stm.facts,
-        "long_term_facts": [
-            {"content": f.content, "category": f.category}
-            for f in _memory_manager.ltm.facts
-        ],
+        "long_term_facts": long_term_facts,
+        "retrieved_memory_ids": [item["memory_id"] for item in long_term_facts],
+        "retrieval": _memory_manager.last_retrieval,
     }
 
     if _memory_manager.ltm.interaction_summaries:

@@ -553,7 +553,11 @@ class EcomAgent:
         messages: list[dict] = [
             {"role": "system", "content": system_content}
         ]
-        messages.extend(self.memory_manager.build_memory_prompt_sections())
+        messages.extend(
+            self.memory_manager.build_memory_prompt_sections(
+                query=self._active_request,
+            )
+        )
         return messages
 
     def _prepare_context_messages(self, force_reactive: bool = False) -> list[dict]:
