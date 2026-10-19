@@ -1,0 +1,435 @@
+{
+  "schema_version": "memory_baseline_v1",
+  "evaluation_mode": "memory_only",
+  "memory_enabled": true,
+  "retrieval_baseline": "original_full_memory_injection_order",
+  "answer_accuracy_mode": "offline_memory_evidence",
+  "cases": [
+    {
+      "case_id": "memory_01",
+      "category": "preference_recall",
+      "user_id": "memory_user_01",
+      "query": "根据我的偏好推荐一个商品。",
+      "relevant_memory_ids": ["m01_01"],
+      "answer_required_keywords": ["家居用品"],
+      "memory_records": [
+        {"memory_id": "m01_01", "content": "用户偏好家居用品。", "category": "preference", "created_at": "2026-01-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m01_02", "content": "用户曾咨询过退换货政策。", "category": "issue", "created_at": "2026-01-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m01_03", "content": "用户购买过 Apple AirPods Pro 2。", "category": "behavior", "created_at": "2026-01-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m01_04", "content": "用户关注商品库存是否充足。", "category": "preference", "created_at": "2026-01-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m01_05", "content": "用户询问过订单 ORD-20240115-001 的物流。", "category": "issue", "created_at": "2026-01-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m01_06", "content": "用户喜欢查看商品的详细规格。", "category": "preference", "created_at": "2026-01-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m01_07", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2026-01-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m01_08", "content": "用户曾询问配送时效。", "category": "issue", "created_at": "2026-01-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m01_09", "content": "用户偏好查看商品价格后再决定。", "category": "preference", "created_at": "2026-01-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m01_10", "content": "用户曾经咨询会员权益。", "category": "issue", "created_at": "2026-01-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_02",
+      "category": "order_status_recall",
+      "user_id": "memory_user_02",
+      "query": "订单 ORD-20240115-001 现在是什么状态？",
+      "relevant_memory_ids": ["m02_05"],
+      "answer_required_keywords": ["ORD-20240115-001", "已发货"],
+      "memory_records": [
+        {"memory_id": "m02_01", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2026-02-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m02_02", "content": "用户曾购买 Nike Air Max 270 运动鞋。", "category": "behavior", "created_at": "2026-02-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m02_03", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2026-02-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m02_04", "content": "用户曾询问退款审核流程。", "category": "issue", "created_at": "2026-02-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m02_05", "content": "订单 ORD-20240115-001 的状态是已发货。", "category": "issue", "created_at": "2026-02-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m02_06", "content": "订单 ORD-20240120-002 仍在待处理。", "category": "issue", "created_at": "2026-02-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m02_07", "content": "用户关注订单总价。", "category": "preference", "created_at": "2026-02-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m02_08", "content": "用户曾询问如何查询物流单号。", "category": "issue", "created_at": "2026-02-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m02_09", "content": "用户购买过蓝牙耳机。", "category": "behavior", "created_at": "2026-02-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m02_10", "content": "用户偏好收到发货提醒。", "category": "preference", "created_at": "2026-02-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_03",
+      "category": "product_detail_recall",
+      "user_id": "memory_user_03",
+      "query": "我之前关注的手机是哪一款？",
+      "relevant_memory_ids": ["m03_10"],
+      "answer_required_keywords": ["小米14 Ultra"],
+      "memory_records": [
+        {"memory_id": "m03_01", "content": "用户喜欢查看电子产品。", "category": "preference", "created_at": "2026-03-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m03_02", "content": "用户曾购买 Apple AirPods Pro 2。", "category": "behavior", "created_at": "2026-03-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m03_03", "content": "用户偏好黑色外观。", "category": "preference", "created_at": "2026-03-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m03_04", "content": "用户关注手机的存储容量。", "category": "preference", "created_at": "2026-03-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m03_05", "content": "用户曾询问手机屏幕尺寸。", "category": "issue", "created_at": "2026-03-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m03_06", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2026-03-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m03_07", "content": "用户曾询问手机配送时间。", "category": "issue", "created_at": "2026-03-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m03_08", "content": "用户关注手机的摄像功能。", "category": "preference", "created_at": "2026-03-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m03_09", "content": "用户曾比较不同品牌的手机价格。", "category": "behavior", "created_at": "2026-03-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m03_10", "content": "用户之前关注过小米14 Ultra 手机。", "category": "preference", "created_at": "2026-03-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_04",
+      "category": "multi_fact_recall",
+      "user_id": "memory_user_04",
+      "query": "我之前那笔订单用的什么快递，现在到哪里了？",
+      "relevant_memory_ids": ["m04_02", "m04_07"],
+      "answer_required_keywords": ["SF1234567890", "顺丰", "上海"],
+      "memory_records": [
+        {"memory_id": "m04_01", "content": "用户喜欢查看物流进度。", "category": "preference", "created_at": "2026-04-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m04_02", "content": "订单 ORD-20240115-001 的物流单号是 SF1234567890。", "category": "issue", "created_at": "2026-04-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m04_03", "content": "用户喜欢家居用品。", "category": "preference", "created_at": "2026-04-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m04_04", "content": "用户曾询问退货流程。", "category": "issue", "created_at": "2026-04-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m04_05", "content": "用户偏好顺丰快递。", "category": "preference", "created_at": "2026-04-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m04_06", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2026-04-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m04_07", "content": "物流单号 SF1234567890 最近到达上海转运中心。", "category": "issue", "created_at": "2026-04-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m04_08", "content": "用户关注预计送达日期。", "category": "preference", "created_at": "2026-04-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m04_09", "content": "用户曾咨询会员权益。", "category": "issue", "created_at": "2026-04-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m04_10", "content": "用户购买过耳机保护壳。", "category": "behavior", "created_at": "2026-04-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_05",
+      "category": "preference_recall",
+      "user_id": "memory_user_05",
+      "query": "推荐商品时，我通常更在意什么？",
+      "relevant_memory_ids": ["m05_04"],
+      "answer_required_keywords": ["商品规格"],
+      "memory_records": [
+        {"memory_id": "m05_01", "content": "用户经常购买电子产品。", "category": "behavior", "created_at": "2026-05-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m05_02", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2026-05-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m05_03", "content": "用户关注商品库存。", "category": "preference", "created_at": "2026-05-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m05_04", "content": "用户在推荐商品时更在意详细规格。", "category": "preference", "created_at": "2026-05-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m05_05", "content": "用户曾询问价格优惠。", "category": "issue", "created_at": "2026-05-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m05_06", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2026-05-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m05_07", "content": "用户买过小米14 Ultra。", "category": "behavior", "created_at": "2026-05-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m05_08", "content": "用户曾咨询退款时效。", "category": "issue", "created_at": "2026-05-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m05_09", "content": "用户喜欢家居用品。", "category": "preference", "created_at": "2026-05-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m05_10", "content": "用户关注会员权益。", "category": "issue", "created_at": "2026-05-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_06",
+      "category": "refund_recall",
+      "user_id": "memory_user_06",
+      "query": "我之前申请退款的订单是什么原因？",
+      "relevant_memory_ids": ["m06_06"],
+      "answer_required_keywords": ["尺码不合适", "ORD-20240118-004"],
+      "memory_records": [
+        {"memory_id": "m06_01", "content": "用户曾购买牛仔裤。", "category": "behavior", "created_at": "2026-06-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m06_02", "content": "用户偏好先查看退款规则。", "category": "preference", "created_at": "2026-06-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m06_03", "content": "用户关注退款到账时间。", "category": "preference", "created_at": "2026-06-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m06_04", "content": "用户曾咨询订单取消。", "category": "issue", "created_at": "2026-06-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m06_05", "content": "用户购买过 Levi's 501 牛仔裤。", "category": "behavior", "created_at": "2026-06-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m06_06", "content": "订单 ORD-20240118-004 的退款原因是尺码不合适。", "category": "issue", "created_at": "2026-06-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m06_07", "content": "用户喜欢查看物流状态。", "category": "preference", "created_at": "2026-06-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m06_08", "content": "用户曾询问会员积分。", "category": "issue", "created_at": "2026-06-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m06_09", "content": "用户喜欢黑色服装。", "category": "preference", "created_at": "2026-06-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m06_10", "content": "用户关注订单总价。", "category": "preference", "created_at": "2026-06-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_07",
+      "category": "stock_preference",
+      "user_id": "memory_user_07",
+      "query": "我之前关注的吸尘器还有库存吗？",
+      "relevant_memory_ids": ["m07_03"],
+      "answer_required_keywords": ["戴森 V15", "库存"],
+      "memory_records": [
+        {"memory_id": "m07_01", "content": "用户喜欢家用电器。", "category": "preference", "created_at": "2026-07-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m07_02", "content": "用户购买过蓝牙耳机。", "category": "behavior", "created_at": "2026-07-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m07_03", "content": "用户之前关注戴森 V15 吸尘器的库存。", "category": "preference", "created_at": "2026-07-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m07_04", "content": "用户偏好查看商品规格。", "category": "preference", "created_at": "2026-07-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m07_05", "content": "用户曾询问配送范围。", "category": "issue", "created_at": "2026-07-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m07_06", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2026-07-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m07_07", "content": "用户曾咨询家电保修。", "category": "issue", "created_at": "2026-07-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m07_08", "content": "用户关注商品价格。", "category": "preference", "created_at": "2026-07-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m07_09", "content": "用户购买过小米手机。", "category": "behavior", "created_at": "2026-07-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m07_10", "content": "用户曾询问退货流程。", "category": "issue", "created_at": "2026-07-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_08",
+      "category": "delivery_recall",
+      "user_id": "memory_user_08",
+      "query": "之前那件商品预计什么时候送到？",
+      "relevant_memory_ids": ["m08_08"],
+      "answer_required_keywords": ["2024-01-19", "ORD-20240115-001"],
+      "memory_records": [
+        {"memory_id": "m08_01", "content": "用户喜欢运动鞋。", "category": "preference", "created_at": "2026-08-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m08_02", "content": "用户偏好黑色鞋款。", "category": "preference", "created_at": "2026-08-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m08_03", "content": "用户曾咨询订单状态。", "category": "issue", "created_at": "2026-08-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m08_04", "content": "用户购买过 AirPods。", "category": "behavior", "created_at": "2026-08-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m08_05", "content": "用户关注物流单号。", "category": "preference", "created_at": "2026-08-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m08_06", "content": "用户曾询问退款审核。", "category": "issue", "created_at": "2026-08-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m08_07", "content": "用户喜欢家居用品。", "category": "preference", "created_at": "2026-08-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m08_08", "content": "订单 ORD-20240115-001 的预计送达日期是 2024-01-19。", "category": "issue", "created_at": "2026-08-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m08_09", "content": "用户关注商品库存。", "category": "preference", "created_at": "2026-08-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m08_10", "content": "用户曾咨询会员权益。", "category": "issue", "created_at": "2026-08-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_09",
+      "category": "multi_fact_preference",
+      "user_id": "memory_user_09",
+      "query": "给我推荐商品时，结合我的颜色和品类偏好。",
+      "relevant_memory_ids": ["m09_06", "m09_09"],
+      "answer_required_keywords": ["黑色", "家居用品"],
+      "memory_records": [
+        {"memory_id": "m09_01", "content": "用户关注商品规格。", "category": "preference", "created_at": "2026-09-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m09_02", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2026-09-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m09_03", "content": "用户偏好查看库存。", "category": "preference", "created_at": "2026-09-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m09_04", "content": "用户曾询问退换货。", "category": "issue", "created_at": "2026-09-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m09_05", "content": "用户喜欢顺丰配送。", "category": "preference", "created_at": "2026-09-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m09_06", "content": "用户偏好黑色商品。", "category": "preference", "created_at": "2026-09-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m09_07", "content": "用户曾购买蓝牙耳机。", "category": "behavior", "created_at": "2026-09-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m09_08", "content": "用户关注价格优惠。", "category": "preference", "created_at": "2026-09-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m09_09", "content": "用户偏好家居用品。", "category": "preference", "created_at": "2026-09-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m09_10", "content": "用户曾咨询物流时效。", "category": "issue", "created_at": "2026-09-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_10",
+      "category": "user_isolation",
+      "user_id": "memory_user_10_a",
+      "query": "我之前偏好的商品类别是什么？",
+      "relevant_memory_ids": ["m10_a01"],
+      "answer_required_keywords": ["家居用品"],
+      "memory_records": [
+        {"memory_id": "m10_a01", "content": "用户偏好家居用品。", "category": "preference", "created_at": "2026-10-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m10_a02", "content": "用户喜欢查看商品规格。", "category": "preference", "created_at": "2026-10-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m10_a03", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2026-10-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m10_a04", "content": "用户曾咨询物流。", "category": "issue", "created_at": "2026-10-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m10_a05", "content": "用户关注商品库存。", "category": "preference", "created_at": "2026-10-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m10_a06", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2026-10-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m10_a07", "content": "用户曾购买 Apple AirPods Pro 2。", "category": "behavior", "created_at": "2026-10-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m10_a08", "content": "用户曾询问退款政策。", "category": "issue", "created_at": "2026-10-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m10_a09", "content": "用户关注价格变化。", "category": "preference", "created_at": "2026-10-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m10_a10", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2026-10-10T09:00:00", "source_session": "s10"}
+      ],
+      "isolation_probe": {
+        "other_user_id": "memory_user_10_b",
+        "other_user_records": [
+          {"memory_id": "m10_b01", "content": "用户偏好蓝牙耳机。", "category": "preference", "created_at": "2026-10-01T09:00:00", "source_session": "s01"}
+        ],
+        "forbidden_keywords": ["蓝牙耳机"]
+      }
+    },
+    {
+      "case_id": "memory_11",
+      "category": "no_relevant_memory",
+      "user_id": "memory_user_11",
+      "query": "我之前有没有咨询过咖啡机？",
+      "relevant_memory_ids": [],
+      "answer_required_keywords": [],
+      "answer_accuracy_evaluable": false,
+      "no_relevant_expected": true,
+      "memory_records": [
+        {"memory_id": "m11_01", "content": "用户偏好家居用品。", "category": "preference", "created_at": "2026-11-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m11_02", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2026-11-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m11_03", "content": "用户曾咨询物流时效。", "category": "issue", "created_at": "2026-11-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m11_04", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2026-11-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m11_05", "content": "用户购买过蓝牙耳机。", "category": "behavior", "created_at": "2026-11-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m11_06", "content": "用户关注商品规格。", "category": "preference", "created_at": "2026-11-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m11_07", "content": "用户曾询问退货流程。", "category": "issue", "created_at": "2026-11-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m11_08", "content": "用户关注订单状态。", "category": "preference", "created_at": "2026-11-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m11_09", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2026-11-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m11_10", "content": "用户曾咨询会员权益。", "category": "issue", "created_at": "2026-11-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_12",
+      "category": "no_relevant_memory",
+      "user_id": "memory_user_12",
+      "query": "我以前买过咖啡机吗？",
+      "relevant_memory_ids": [],
+      "answer_required_keywords": [],
+      "answer_accuracy_evaluable": false,
+      "no_relevant_expected": true,
+      "memory_records": [
+        {"memory_id": "m12_01", "content": "用户购买过小米手机。", "category": "behavior", "created_at": "2026-12-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m12_02", "content": "用户偏好查看商品价格。", "category": "preference", "created_at": "2026-12-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m12_03", "content": "用户曾询问退款进度。", "category": "issue", "created_at": "2026-12-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m12_04", "content": "用户喜欢家居用品。", "category": "preference", "created_at": "2026-12-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m12_05", "content": "用户购买过 AirPods。", "category": "behavior", "created_at": "2026-12-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m12_06", "content": "用户关注配送日期。", "category": "preference", "created_at": "2026-12-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m12_07", "content": "用户曾咨询订单取消。", "category": "issue", "created_at": "2026-12-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m12_08", "content": "用户偏好黑色商品。", "category": "preference", "created_at": "2026-12-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m12_09", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2026-12-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m12_10", "content": "用户曾咨询会员积分。", "category": "issue", "created_at": "2026-12-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_13",
+      "category": "memory_update",
+      "user_id": "memory_user_13",
+      "query": "我现在偏好的商品类别是什么？",
+      "relevant_memory_ids": ["m13_10"],
+      "answer_required_keywords": ["数码产品"],
+      "answer_forbidden_keywords": ["家居用品"],
+      "update_expectation": {"latest_memory_id": "m13_10", "stale_memory_ids": ["m13_02"]},
+      "memory_records": [
+        {"memory_id": "m13_01", "content": "用户关注商品规格。", "category": "preference", "created_at": "2027-01-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m13_02", "content": "用户之前偏好家居用品。", "category": "preference", "created_at": "2027-01-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m13_03", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2027-01-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m13_04", "content": "用户曾询问物流。", "category": "issue", "created_at": "2027-01-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m13_05", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2027-01-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m13_06", "content": "用户关注价格优惠。", "category": "preference", "created_at": "2027-01-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m13_07", "content": "用户曾咨询退款流程。", "category": "issue", "created_at": "2027-01-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m13_08", "content": "用户购买过蓝牙耳机。", "category": "behavior", "created_at": "2027-01-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m13_09", "content": "用户关注商品库存。", "category": "preference", "created_at": "2027-01-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m13_10", "content": "用户现在偏好数码产品。", "category": "preference", "created_at": "2027-01-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_14",
+      "category": "memory_conflict",
+      "user_id": "memory_user_14",
+      "query": "订单 ORD-20240115-001 当前状态是什么？",
+      "relevant_memory_ids": ["m14_09"],
+      "answer_required_keywords": ["已签收"],
+      "answer_forbidden_keywords": ["已发货"],
+      "update_expectation": {"latest_memory_id": "m14_09", "stale_memory_ids": ["m14_02"]},
+      "memory_records": [
+        {"memory_id": "m14_01", "content": "用户关注物流状态。", "category": "preference", "created_at": "2027-02-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m14_02", "content": "订单 ORD-20240115-001 之前状态为已发货。", "category": "issue", "created_at": "2027-02-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m14_03", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2027-02-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m14_04", "content": "用户曾询问预计送达日期。", "category": "issue", "created_at": "2027-02-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m14_05", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2027-02-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m14_06", "content": "用户喜欢查看订单详情。", "category": "preference", "created_at": "2027-02-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m14_07", "content": "用户曾咨询售后服务。", "category": "issue", "created_at": "2027-02-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m14_08", "content": "用户关注签收状态。", "category": "preference", "created_at": "2027-02-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m14_09", "content": "订单 ORD-20240115-001 当前状态为已签收。", "category": "issue", "created_at": "2027-02-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m14_10", "content": "用户曾咨询退货政策。", "category": "issue", "created_at": "2027-02-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_15",
+      "category": "user_isolation",
+      "user_id": "memory_user_15_a",
+      "query": "我的配送偏好是什么？",
+      "relevant_memory_ids": ["m15_a01"],
+      "answer_required_keywords": ["顺丰"],
+      "memory_records": [
+        {"memory_id": "m15_a01", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2027-03-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m15_a02", "content": "用户喜欢家居用品。", "category": "preference", "created_at": "2027-03-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m15_a03", "content": "用户曾购买运动鞋。", "category": "behavior", "created_at": "2027-03-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m15_a04", "content": "用户关注物流状态。", "category": "preference", "created_at": "2027-03-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m15_a05", "content": "用户曾询问退款。", "category": "issue", "created_at": "2027-03-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m15_a06", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2027-03-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m15_a07", "content": "用户购买过蓝牙耳机。", "category": "behavior", "created_at": "2027-03-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m15_a08", "content": "用户关注商品价格。", "category": "preference", "created_at": "2027-03-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m15_a09", "content": "用户曾咨询会员权益。", "category": "issue", "created_at": "2027-03-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m15_a10", "content": "用户关注库存。", "category": "preference", "created_at": "2027-03-10T09:00:00", "source_session": "s10"}
+      ],
+      "isolation_probe": {
+        "other_user_id": "memory_user_15_b",
+        "other_user_records": [{"memory_id": "m15_b01", "content": "用户偏好圆通配送。", "category": "preference", "created_at": "2027-03-01T09:00:00", "source_session": "s01"}],
+        "forbidden_keywords": ["圆通"]
+      }
+    },
+    {
+      "case_id": "memory_16",
+      "category": "user_isolation",
+      "user_id": "memory_user_16_a",
+      "query": "我喜欢什么颜色的商品？",
+      "relevant_memory_ids": ["m16_a01"],
+      "answer_required_keywords": ["黑色"],
+      "memory_records": [
+        {"memory_id": "m16_a01", "content": "用户偏好黑色商品。", "category": "preference", "created_at": "2027-04-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m16_a02", "content": "用户喜欢查看商品规格。", "category": "preference", "created_at": "2027-04-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m16_a03", "content": "用户购买过手机。", "category": "behavior", "created_at": "2027-04-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m16_a04", "content": "用户曾咨询配送。", "category": "issue", "created_at": "2027-04-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m16_a05", "content": "用户关注库存。", "category": "preference", "created_at": "2027-04-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m16_a06", "content": "用户偏好家居用品。", "category": "preference", "created_at": "2027-04-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m16_a07", "content": "用户购买过 AirPods。", "category": "behavior", "created_at": "2027-04-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m16_a08", "content": "用户曾咨询退货。", "category": "issue", "created_at": "2027-04-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m16_a09", "content": "用户关注价格。", "category": "preference", "created_at": "2027-04-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m16_a10", "content": "用户喜欢顺丰配送。", "category": "preference", "created_at": "2027-04-10T09:00:00", "source_session": "s10"}
+      ],
+      "isolation_probe": {
+        "other_user_id": "memory_user_16_b",
+        "other_user_records": [{"memory_id": "m16_b01", "content": "用户偏好红色商品。", "category": "preference", "created_at": "2027-04-01T09:00:00", "source_session": "s01"}],
+        "forbidden_keywords": ["红色"]
+      }
+    },
+    {
+      "case_id": "memory_17",
+      "category": "product_recall",
+      "user_id": "memory_user_17",
+      "query": "我之前关注过哪款耳机？",
+      "relevant_memory_ids": ["m17_07"],
+      "answer_required_keywords": ["AirPods Pro 2"],
+      "memory_records": [
+        {"memory_id": "m17_01", "content": "用户喜欢家居用品。", "category": "preference", "created_at": "2027-05-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m17_02", "content": "用户关注商品价格。", "category": "preference", "created_at": "2027-05-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m17_03", "content": "用户曾咨询物流。", "category": "issue", "created_at": "2027-05-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m17_04", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2027-05-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m17_05", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2027-05-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m17_06", "content": "用户曾咨询退款。", "category": "issue", "created_at": "2027-05-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m17_07", "content": "用户之前关注 Apple AirPods Pro 2。", "category": "preference", "created_at": "2027-05-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m17_08", "content": "用户关注库存。", "category": "preference", "created_at": "2027-05-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m17_09", "content": "用户曾询问会员权益。", "category": "issue", "created_at": "2027-05-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m17_10", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2027-05-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_18",
+      "category": "order_recall",
+      "user_id": "memory_user_18",
+      "query": "我的订单 ORD-20240120-002 是什么状态？",
+      "relevant_memory_ids": ["m18_09"],
+      "answer_required_keywords": ["ORD-20240120-002", "待处理"],
+      "memory_records": [
+        {"memory_id": "m18_01", "content": "用户喜欢电子产品。", "category": "preference", "created_at": "2027-06-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m18_02", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2027-06-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m18_03", "content": "用户曾询问物流。", "category": "issue", "created_at": "2027-06-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m18_04", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2027-06-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m18_05", "content": "用户关注库存。", "category": "preference", "created_at": "2027-06-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m18_06", "content": "用户曾咨询退款。", "category": "issue", "created_at": "2027-06-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m18_07", "content": "用户喜欢家居用品。", "category": "preference", "created_at": "2027-06-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m18_08", "content": "用户关注订单处理时间。", "category": "preference", "created_at": "2027-06-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m18_09", "content": "订单 ORD-20240120-002 当前状态是待处理。", "category": "issue", "created_at": "2027-06-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m18_10", "content": "用户曾咨询会员积分。", "category": "issue", "created_at": "2027-06-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_19",
+      "category": "multi_fact_recall",
+      "user_id": "memory_user_19",
+      "query": "推荐家居商品时，结合我的颜色和配送偏好。",
+      "relevant_memory_ids": ["m19_03", "m19_08"],
+      "answer_required_keywords": ["家居用品", "黑色", "顺丰"],
+      "memory_records": [
+        {"memory_id": "m19_01", "content": "用户关注商品规格。", "category": "preference", "created_at": "2027-07-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m19_02", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2027-07-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m19_03", "content": "用户偏好家居用品和黑色商品。", "category": "preference", "created_at": "2027-07-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m19_04", "content": "用户曾咨询退款。", "category": "issue", "created_at": "2027-07-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m19_05", "content": "用户关注库存。", "category": "preference", "created_at": "2027-07-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m19_06", "content": "用户购买过蓝牙耳机。", "category": "behavior", "created_at": "2027-07-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m19_07", "content": "用户曾询问配送时效。", "category": "issue", "created_at": "2027-07-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m19_08", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2027-07-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m19_09", "content": "用户关注价格优惠。", "category": "preference", "created_at": "2027-07-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m19_10", "content": "用户曾咨询会员权益。", "category": "issue", "created_at": "2027-07-10T09:00:00", "source_session": "s10"}
+      ]
+    },
+    {
+      "case_id": "memory_20",
+      "category": "process_restart_persistence",
+      "user_id": "memory_user_20",
+      "query": "重启后我之前偏好的品类是什么？",
+      "relevant_memory_ids": ["m20_04"],
+      "answer_required_keywords": ["家居用品"],
+      "process_restart_expected": true,
+      "memory_records": [
+        {"memory_id": "m20_01", "content": "用户喜欢查看商品规格。", "category": "preference", "created_at": "2027-08-01T09:00:00", "source_session": "s01"},
+        {"memory_id": "m20_02", "content": "用户购买过运动鞋。", "category": "behavior", "created_at": "2027-08-02T09:00:00", "source_session": "s02"},
+        {"memory_id": "m20_03", "content": "用户曾咨询物流。", "category": "issue", "created_at": "2027-08-03T09:00:00", "source_session": "s03"},
+        {"memory_id": "m20_04", "content": "用户偏好家居用品。", "category": "preference", "created_at": "2027-08-04T09:00:00", "source_session": "s04"},
+        {"memory_id": "m20_05", "content": "用户喜欢黑色商品。", "category": "preference", "created_at": "2027-08-05T09:00:00", "source_session": "s05"},
+        {"memory_id": "m20_06", "content": "用户购买过 AirPods。", "category": "behavior", "created_at": "2027-08-06T09:00:00", "source_session": "s06"},
+        {"memory_id": "m20_07", "content": "用户关注库存。", "category": "preference", "created_at": "2027-08-07T09:00:00", "source_session": "s07"},
+        {"memory_id": "m20_08", "content": "用户曾咨询退款。", "category": "issue", "created_at": "2027-08-08T09:00:00", "source_session": "s08"},
+        {"memory_id": "m20_09", "content": "用户偏好顺丰配送。", "category": "preference", "created_at": "2027-08-09T09:00:00", "source_session": "s09"},
+        {"memory_id": "m20_10", "content": "用户关注价格优惠。", "category": "preference", "created_at": "2027-08-10T09:00:00", "source_session": "s10"}
+      ]
+    }
+  ]
+}

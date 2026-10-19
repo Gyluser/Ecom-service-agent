@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -39,18 +40,36 @@ TOP_K = 10
 METRIC_KS = (1, 3, 5, 10)
 HYBRID_CANDIDATE_K = 10
 LEAKAGE_MARKERS = ("检索测试问题", "测试问题示例")
-EXPECTED_SOURCE_COUNTS = {
-    "project_original": 4,
-    "tau_bench_adapted": 15,
-    "tau_bench_expanded": 31,
-    "tau_bench_expanded_100": 50,
-}
-EXPECTED_TYPE_COUNTS = {
-    "direct": 4,
-    "paraphrase": 41,
-    "ambiguous": 10,
-    "hard_negative": 30,
-    "multi_chunk": 15,
+LEGACY_EXPECTED_DISTRIBUTIONS = {
+    50: {
+        "source": {
+            "project_original": 4,
+            "tau_bench_adapted": 15,
+            "tau_bench_expanded": 31,
+        },
+        "type": {
+            "direct": 4,
+            "paraphrase": 14,
+            "ambiguous": 4,
+            "hard_negative": 13,
+            "multi_chunk": 15,
+        },
+    },
+    100: {
+        "source": {
+            "project_original": 4,
+            "tau_bench_adapted": 15,
+            "tau_bench_expanded": 31,
+            "tau_bench_expanded_100": 50,
+        },
+        "type": {
+            "direct": 4,
+            "paraphrase": 41,
+            "ambiguous": 10,
+            "hard_negative": 30,
+            "multi_chunk": 15,
+        },
+    },
 }
 
 
@@ -62,13 +81,13 @@ def _normalize(value: str) -> str:
     return re.sub(r"\s+", "", value or "")
 
 
-def _load_cases() -> list[dict[str, Any]]:
-    payload = json.loads(CASES_PATH.read_text(encoding="utf-8"))
+def _load_cases(cases_path: Path = CASES_PATH) -> list[dict[str, Any]]:
+    payload = json.loads(cases_path.read_text(encoding="utf-8"))
     cases = payload.get("cases")
     if not isinstance(cases, list):
-        raise ValueError("chunk_cases_100.json 缺少 cases 列表")
-    if len(cases) != 100:
-        raise ValueError(f"测试集数量应为 100，实际为 {len(cases)}")
+        raise ValueError(f"{cases_path.name} 缺少 cases 列表")
+    if len(cases) not in LEGACY_EXPECTED_DISTRIBUTIONS and len(cases) != 100:
+        raise ValueError(f"测试集数量应为 50 或 100，实际为 {len(cases)}")
 
     ids = [case.get("id") for case in cases]
     if len(set(ids)) != len(ids):
@@ -81,23 +100,38 @@ def _load_cases() -> list[dict[str, Any]]:
             raise ValueError(f"{case.get('id')} 的可回答用例必须 answerable=true")
 
     source_counts = Counter(case["source_scope"] for case in cases)
-    if dict(source_counts) != EXPECTED_SOURCE_COUNTS:
-        raise ValueError(f"source_scope 分布错误：{dict(source_counts)}")
-
     type_counts = Counter(
         query_type
         for case in cases
         for query_type in case.get("query_type", [])
     )
-    if dict(type_counts) != EXPECTED_TYPE_COUNTS:
-        raise ValueError(f"query_type 分布错误：{dict(type_counts)}")
-
-    multi_flag_count = sum(case.get("requires_multi_chunk", False) for case in cases)
-    multi_gold_count = sum(len(case.get("gold_evidence", [])) > 1 for case in cases)
-    if multi_flag_count != 15:
-        raise ValueError(f"requires_multi_chunk=true 应恰好为 15 条，实际为 {multi_flag_count}")
-    if multi_gold_count != 15:
-        raise ValueError(f"包含多条 gold_evidence 的用例应恰好为 15 条，实际为 {multi_gold_count}")
+    composition = payload.get("composition")
+    if composition:
+        original_count = composition.get("original_case_count")
+        added_count = composition.get("added_case_count")
+        added_hard_count = composition.get("added_hard_negative_count")
+        if original_count != 50 or added_count != 50 or added_hard_count != 17:
+            raise ValueError("composition 必须声明 50 条原始、50 条新增和 17 条困难新增样本")
+        added_cases = cases[original_count:]
+        if len(added_cases) != added_count:
+            raise ValueError("composition 与实际新增样本数量不一致")
+        if any(case.get("requires_multi_chunk") for case in added_cases):
+            raise ValueError("新增样本必须全部为单 chunk")
+        hard_count = sum("hard_negative" in case["query_type"] for case in added_cases)
+        if hard_count != added_hard_count:
+            raise ValueError(f"新增 hard_negative 应为 {added_hard_count} 条，实际为 {hard_count}")
+    else:
+        expected = LEGACY_EXPECTED_DISTRIBUTIONS[len(cases)]
+        if dict(source_counts) != expected["source"]:
+            raise ValueError(f"source_scope 分布错误：{dict(source_counts)}")
+        if dict(type_counts) != expected["type"]:
+            raise ValueError(f"query_type 分布错误：{dict(type_counts)}")
+        multi_flag_count = sum(case.get("requires_multi_chunk", False) for case in cases)
+        multi_gold_count = sum(len(case.get("gold_evidence", [])) > 1 for case in cases)
+        if multi_flag_count != 15:
+            raise ValueError(f"requires_multi_chunk=true 应恰好为 15 条，实际为 {multi_flag_count}")
+        if multi_gold_count != 15:
+            raise ValueError(f"包含多条 gold_evidence 的用例应恰好为 15 条，实际为 {multi_gold_count}")
 
     required_fields = {
         "id",
@@ -386,8 +420,12 @@ def _group_summary(results: list[dict[str, Any]], field: str) -> dict[str, Any]:
     }
 
 
-def _save_report(report: dict[str, Any]) -> Path:
+def _save_report(report: dict[str, Any], output_path: Path | None = None) -> Path:
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        return output_path
     now = _now_beijing()
     filename = now.strftime("chunk_eval_%Y_%m-%d_%H%M.json")
     output = RESULT_DIR / filename
@@ -436,8 +474,10 @@ def run(
     backend_name: str,
     pipeline_name: str = "baseline",
     reranker_model: str | None = None,
-) -> Path:
-    cases = _load_cases()
+    cases_path: Path = CASES_PATH,
+    save_report: bool = True,
+) -> dict[str, Any]:
+    cases = _load_cases(cases_path)
     chunks = chunk_markdown_dir(KB_DIR)
     if not chunks:
         raise ValueError("评估知识库没有生成 chunk")
@@ -447,10 +487,12 @@ def run(
     results = _run_cases(cases, gold_ids, pipeline)
 
     report = {
-        "test": "ecom_rag_chunk_eval_100",
+        "test": f"ecom_rag_chunk_eval_{len(cases)}",
         "started_at": _now_beijing().isoformat(),
         "backend": backend_name,
         "pipeline": pipeline_name,
+        "cases_path": str(cases_path),
+        "cases_sha256": hashlib.sha256(cases_path.read_bytes()).hexdigest(),
         "top_k": TOP_K,
         "agent_loop": False,
         "index_action": index_action,
@@ -477,10 +519,12 @@ def run(
         "by_query_type": _group_summary(results, "query_type"),
         "cases": results,
     }
+    if not save_report:
+        return report
     output = _save_report(report)
     print(json.dumps(report["summary"], ensure_ascii=False, indent=2))
     print(f"结果已保存：{output}")
-    return output
+    return report
 
 
 def main() -> None:
@@ -496,8 +540,74 @@ def main() -> None:
         default=None,
         help="hybrid-rerank 使用的本地 Cross-Encoder 模型目录",
     )
+    parser.add_argument(
+        "--cases-path",
+        type=Path,
+        default=CASES_PATH,
+        help="待评估数据集 JSON 路径",
+    )
+    parser.add_argument(
+        "--all-pipelines",
+        action="store_true",
+        help="在同一数据集上顺序执行 baseline、hybrid 和 hybrid-rerank，并写入一个聚合 JSON",
+    )
+    parser.add_argument(
+        "--combined-output",
+        type=Path,
+        default=None,
+        help="--all-pipelines 的聚合结果 JSON 输出路径",
+    )
+    parser.add_argument(
+        "--comparison-cases-path",
+        type=Path,
+        action="append",
+        default=[],
+        help="额外纳入同一聚合结果的评测集路径；仅与 --all-pipelines 一起使用",
+    )
     args = parser.parse_args()
-    run(args.backend, args.pipeline, args.reranker_model)
+    if not args.all_pipelines:
+        run(args.backend, args.pipeline, args.reranker_model, args.cases_path)
+        return
+
+    if not args.reranker_model:
+        parser.error("--all-pipelines 需要提供 --reranker-model")
+    cases_paths = [args.cases_path, *args.comparison_cases_path]
+    dataset_reports = {}
+    for cases_path in cases_paths:
+        reports = {
+            name: run(
+                args.backend,
+                name,
+                args.reranker_model,
+                cases_path,
+                save_report=False,
+            )
+            for name in ("baseline", "hybrid", "hybrid-rerank")
+        }
+        dataset_reports[cases_path.stem] = {
+            "cases_path": str(cases_path),
+            "cases_sha256": hashlib.sha256(cases_path.read_bytes()).hexdigest(),
+            "runs": reports,
+        }
+    combined = {
+        "test": "ecom_rag_chunk_eval_multi_dataset_three_pipelines",
+        "created_at": _now_beijing().isoformat(),
+        "agent_loop": False,
+        "datasets": dataset_reports,
+    }
+    output = args.combined_output or RESULT_DIR / "chunk_eval_three_pipelines.json"
+    _save_report(combined, output)
+    print(
+        json.dumps(
+            {
+                dataset: {name: report["summary"] for name, report in value["runs"].items()}
+                for dataset, value in dataset_reports.items()
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    print(f"聚合结果已保存：{output}")
 
 
 if __name__ == "__main__":
