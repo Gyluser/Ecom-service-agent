@@ -4,8 +4,8 @@ from typing import Optional
 
 from openai import OpenAI
 
+from app.agent.context import ContextManager
 from app.agent.storage import delete_session, load_session, save_session
-from app.agent.summarizer import summarize
 from app.config.settings import settings
 from app.prompts.customer_service import SYSTEM_PROMPT
 from app.schemas.response import CustomerServiceResponse, IntentType
@@ -26,6 +26,20 @@ class EcomAgent:
         self.history_threshold = settings.history_threshold
         self.history_keep_recent = settings.history_keep_recent
         self.max_react_steps = settings.max_react_steps
+        self.context_manager = ContextManager(
+            client=self.client,
+            model=self.model,
+            archive_dir=settings.context_archive_dir,
+            char_limit=settings.context_char_limit,
+            target_ratio=settings.context_target_ratio,
+            tool_batch_char_limit=settings.context_tool_batch_char_limit,
+            large_result_char_limit=settings.context_large_result_char_limit,
+            summary_input_char_limit=settings.context_summary_input_char_limit,
+            max_messages=settings.context_max_messages,
+            keep_recent_messages=settings.context_keep_recent_messages,
+            keep_recent_tool_results=settings.context_keep_recent_tool_results,
+            working_context_messages=settings.context_working_messages,
+        ) if settings.context_enabled else None
 
         self.tool_manager = ToolManager(
             use_mcp=settings.mcp_enabled,
@@ -61,6 +75,8 @@ class EcomAgent:
         self._current_turn_extra_tools: set[str] = set()
         self._current_turn_tools_blocked = False
         self._current_turn_tool_results: dict[tuple[str, str], str] = {}
+        self._current_turn_start = 0
+        self._active_request = ""
         # 对外的 intent 表示用户最终目标；该字段只记录本轮最近一次工具动作，
         # 不写入 CustomerServiceResponse，避免把“查订单”误当成“退款”等最终意图。
         self._current_turn_action: Optional[str] = None
@@ -69,6 +85,7 @@ class EcomAgent:
         if loaded:
             self.summary = loaded["summary"]
             self.raw_messages = loaded["messages"]
+            self._current_turn_start = len(self.raw_messages)
             if loaded.get("short_term_memory"):
                 self.memory_manager.restore_stm(loaded["short_term_memory"])
 
@@ -83,6 +100,8 @@ class EcomAgent:
         self._current_turn_tools_blocked = False
         self._current_turn_tool_results = {}
         self._current_turn_action = None
+        self._current_turn_start = len(self.raw_messages)
+        self._active_request = user_input
         self.raw_messages.append({"role": "user", "content": user_input})
 
         final_text = self._react_loop()
@@ -94,7 +113,15 @@ class EcomAgent:
             {"role": "assistant", "content": result.model_dump_json(ensure_ascii=False)}
         )
 
-        if len(self.raw_messages) > self.history_threshold:
+        # 保留旧测试/调用方显式覆盖 history_threshold 的兼容行为；正常生产
+        # 路径不再在 chat 结束后按消息条数压缩，而是在每次模型调用前按预算压缩。
+        if (
+            len(self.raw_messages) > self.history_threshold
+            and (
+                self.context_manager is None
+                or self.history_threshold != settings.history_threshold
+            )
+        ):
             self._compress_history()
 
         save_session(
@@ -122,7 +149,7 @@ class EcomAgent:
     def _react_loop(self) -> str:
         """ReAct 循环：调用 LLM → 执行工具 → 观察结果 → 重复，直到模型给出最终回答。"""
         for step in range(self.max_react_steps):
-            messages = self._build_messages()
+            messages = self._prepare_context_messages()
             tool_definitions = (
                 []
                 if self._current_turn_tools_blocked
@@ -140,7 +167,7 @@ class EcomAgent:
                     "role": "system",
                     "content": "当前没有可用工具，请直接根据已有信息回答，不要输出任何工具调用标记。",
                 })
-            response = self.client.chat.completions.create(**request_kwargs)
+            response = self._create_with_context_retry(request_kwargs)
             choice = response.choices[0]
             assistant_msg = choice.message
 
@@ -150,9 +177,6 @@ class EcomAgent:
             if not assistant_msg.tool_calls:
                 content = assistant_msg.content or ""
                 assistant_record = {"role": "assistant", "content": content}
-                reasoning_content = getattr(assistant_msg, "reasoning_content", None)
-                if reasoning_content:
-                    assistant_record["reasoning_content"] = reasoning_content
                 self.raw_messages.append(assistant_record)
                 if self._contains_tool_marker(content):
                     self._current_turn_tools_blocked = True
@@ -172,9 +196,6 @@ class EcomAgent:
                     "role": "assistant",
                     "content": assistant_msg.content or "",
                 }
-                reasoning_content = getattr(assistant_msg, "reasoning_content", None)
-                if reasoning_content:
-                    assistant_record["reasoning_content"] = reasoning_content
                 self.raw_messages.append(assistant_record)
                 self._current_turn_tools_blocked = True
                 continue
@@ -182,6 +203,8 @@ class EcomAgent:
             msg_dict = {"role": "assistant", "content": assistant_msg.content}
             reasoning_content = getattr(assistant_msg, "reasoning_content", None)
             if reasoning_content:
+                # thinking 模式要求工具调用的 assistant 消息把该字段传回下一次请求。
+                # ContextManager 只会在非工具 assistant 消息上移除它。
                 msg_dict["reasoning_content"] = reasoning_content
             msg_dict["tool_calls"] = [
                 {
@@ -222,23 +245,25 @@ class EcomAgent:
                 ):
                     self._current_turn_extra_tools.add("list_user_orders")
 
+                context_result = (
+                    self.context_manager.compact_tool_result(tc.id, result_str)
+                    if self.context_manager is not None
+                    else result_str
+                )
                 self.raw_messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": result_str,
+                    "content": context_result,
                 })
 
-        messages = self._build_messages()
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-        )
+        messages = self._prepare_context_messages()
+        response = self._create_with_context_retry({
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+        })
         content = response.choices[0].message.content or ""
         assistant_record = {"role": "assistant", "content": content}
-        reasoning_content = getattr(response.choices[0].message, "reasoning_content", None)
-        if reasoning_content:
-            assistant_record["reasoning_content"] = reasoning_content
         self.raw_messages.append(assistant_record)
         return content
 
@@ -327,6 +352,9 @@ class EcomAgent:
                 }
 
         candidates.update(self._current_turn_extra_tools)
+        uncalled = candidates - self._current_turn_called_tools
+        if self._current_turn_called_tools:
+            candidates = uncalled
         return [
             definition
             for definition in self.tool_manager.tool_definitions
@@ -506,14 +534,7 @@ class EcomAgent:
         )
 
     def _build_messages(self) -> list[dict]:
-        system_content = SYSTEM_PROMPT
-        if self.skill_manager and self.skill_manager.enabled:
-            system_content += self.skill_manager.build_catalog_prompt()
-
-        messages: list[dict] = [
-            {"role": "system", "content": system_content}
-        ]
-        messages.extend(self.memory_manager.build_memory_prompt_sections())
+        messages = self._build_static_messages()
         if self.summary:
             messages.append(
                 {
@@ -524,28 +545,72 @@ class EcomAgent:
         messages.extend(self.raw_messages)
         return messages
 
-    def _compress_history(self) -> None:
-        keep = self.history_keep_recent
-        split = len(self.raw_messages) - keep
-        while split > 0 and self.raw_messages[split].get("role") in ("tool",):
-            split -= 1
-        if split <= 0:
-            return
-        old_messages = self.raw_messages[:split]
-        recent = self.raw_messages[split:]
+    def _build_static_messages(self) -> list[dict]:
+        system_content = SYSTEM_PROMPT
+        if self.skill_manager and self.skill_manager.enabled:
+            system_content += self.skill_manager.build_catalog_prompt()
 
-        new_summary = summarize(
-            client=self.client,
-            model=self.model,
-            old_messages=old_messages,
-            prev_summary=self.summary,
+        messages: list[dict] = [
+            {"role": "system", "content": system_content}
+        ]
+        messages.extend(self.memory_manager.build_memory_prompt_sections())
+        return messages
+
+    def _prepare_context_messages(self, force_reactive: bool = False) -> list[dict]:
+        if self.context_manager is None:
+            return self._build_messages()
+
+        preparation = self.context_manager.prepare(
+            system_messages=self._build_static_messages(),
+            raw_messages=self.raw_messages,
+            summary=self.summary,
+            active_request=self._active_request,
+            current_turn_start=self._current_turn_start,
+            force_reactive=force_reactive,
         )
-        self.summary = new_summary
-        self.raw_messages = recent
-        print(
-            f"\n💾 [已压缩 {len(old_messages)} 条老消息 → summary "
-            f"({len(new_summary)} 字)]\n"
-        )
+        self.raw_messages = preparation.raw_messages
+        self.summary = preparation.summary
+
+        # 压缩保留当前轮，因此重新定位当前轮起点，避免下一次压缩把当前请求
+        # 当成旧历史归档。
+        current_indices = [
+            index for index, message in enumerate(self.raw_messages)
+            if message.get("role") == "user"
+            and message.get("content") == self._active_request
+        ]
+        if current_indices:
+            self._current_turn_start = current_indices[-1]
+        else:
+            self._current_turn_start = max(0, len(self.raw_messages) - 1)
+        return preparation.messages
+
+    def _create_with_context_retry(self, request_kwargs: dict) -> object:
+        retry_count = 0
+        while True:
+            try:
+                return self.client.chat.completions.create(**request_kwargs)
+            except Exception as exc:
+                if (
+                    self.context_manager is None
+                    or not self.context_manager.is_context_length_error(exc)
+                    or retry_count >= 1
+                ):
+                    raise
+                retry_count += 1
+                request_kwargs["messages"] = self._prepare_context_messages(
+                    force_reactive=True
+                )
+
+    def _compress_history(self) -> None:
+        """兼容旧调用方；实际压缩由每次模型调用前的 ContextManager 完成。"""
+        if self.context_manager is None:
+            return
+        previous_keep = self.context_manager.keep_recent_messages
+        self.context_manager.keep_recent_messages = max(2, self.history_keep_recent * 2)
+        try:
+            self._prepare_context_messages(force_reactive=True)
+        finally:
+            self.context_manager.keep_recent_messages = previous_keep
 
     def _print_thought(self, text: str) -> None:
         print(f"\n💭 [思考] {text}")

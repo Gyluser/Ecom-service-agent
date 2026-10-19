@@ -1,0 +1,417 @@
+{
+  "dataset": "Ecom Context Compression Stress Test adapted from tau-bench Retail",
+  "version": 1,
+  "evaluation_mode": "context_only",
+  "memory_enabled": false,
+  "mapping_policy": "只使用当前 Ecom Mock 订单、商品和工具；不模拟 tau-bench 原始数据库状态。",
+  "evaluation_policy": {
+    "focus": "context_continuity",
+    "tool_calls": "diagnostic_not_required_at_exact_turn",
+    "keyword_match": "all_required_with_alternatives",
+    "fact_match": "exact_or_variants"
+  },
+  "cases": [
+    {
+      "id": "context_01",
+      "description": "延迟提供订单号并在多轮闲聊后查询订单详情",
+      "turns": [
+        "我想查一下我的订单，但暂时想不起订单号。",
+        "我记得买的是一双运动鞋。",
+        "先不用查了，我想问一下已经发货的商品还能不能申请退款。",
+        "如果只是想了解政策，需要现在就提交申请吗？",
+        "明白了，我还是想回到刚才的订单查询。",
+        "订单号是 ORD-20240115-001。",
+        "请告诉我这笔订单买了什么、现在是什么状态。",
+        "另外请确认一下订单金额。"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": ["Nike", "899"],
+      "expected_requires_human": false,
+      "expected_tools": ["query_order"],
+      "min_tool_calls": 1,
+      "max_tokens": 30000,
+      "category": "context_stress",
+      "source_task_id": "54",
+      "mapping_notes": "延迟提供订单号，测试早期目标和后期订单号能否跨压缩保留。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": ["success", "ORD-20240115-001"],
+          "arguments": {"order_id": "ORD-20240115-001"}
+        }
+      ],
+      "context_facts": [
+        {"id": "target_order", "content": "ORD-20240115-001", "content_variants": ["Nike Air Max 270 运动鞋", "¥899.00", "已发货"], "introduced_at": 6, "required_at": [7, 8], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 7, "expected_keywords": ["Nike", "899", ["已发货", "发货"]]},
+        {"turn_index": 8, "expected_keywords": ["ORD-20240115-001", "899"]}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["ORD-20240115-001"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_02",
+      "description": "先咨询商品，再切换到订单物流查询",
+      "turns": [
+        "我之前买过 AirPods，想先了解一下这个商品。",
+        "它的主要功能和价格是什么？",
+        "我还想问一下保护壳是否适配。",
+        "先不看商品了，我想查一下之前那笔订单的配送情况。",
+        "订单号是 ORD-20240120-002。",
+        "这个订单现在发货了吗？",
+        "如果还没有发货，物流查询应该怎么处理？",
+        "请直接告诉我这笔订单目前的状态。"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": ["ORD-20240120-002", ["尚未发货", "待发货", "未发货"]],
+      "expected_requires_human": false,
+      "expected_tools": ["query_logistics"],
+      "min_tool_calls": 1,
+      "max_tokens": 30000,
+      "category": "context_stress",
+      "source_task_id": "55",
+      "mapping_notes": "测试商品咨询上下文不能覆盖后续订单物流任务。",
+      "expected_business_checks": [
+        {
+          "tool": "query_logistics",
+          "result_keywords": ["尚未发货"],
+          "arguments": {"order_id": "ORD-20240120-002"}
+        }
+      ],
+      "context_facts": [
+        {"id": "target_order", "content": "ORD-20240120-002", "introduced_at": 5, "required_at": [6, 8], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 6, "expected_keywords": ["ORD-20240120-002", ["尚未发货", "待发货", "未发货"]]},
+        {"turn_index": 8, "expected_keywords": ["ORD-20240120-002", ["尚未发货", "待发货", "未发货"]]}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["ORD-20240120-002"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_03",
+      "description": "先列出订单，之后从列表中选择退款中的订单",
+      "turns": [
+        "我不确定订单号，先帮我列出最近的订单。",
+        "我看到有几笔不同状态的订单。",
+        "其中有一笔商品是牛仔裤，对吗？",
+        "先不用处理，我想问一下已签收商品的退货规则。",
+        "如果订单已经在退款处理中，还需要重复申请吗？",
+        "回到刚才的订单列表，我要处理牛仔裤那一笔。",
+        "订单号是 ORD-20240118-004，请告诉我现在的退款状态。",
+        "只需要确认进度，不要再次提交退款。"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": ["ORD-20240118-004", "审核中"],
+      "expected_requires_human": false,
+      "expected_tools": ["list_user_orders", "query_order"],
+      "min_tool_calls": 2,
+      "max_tokens": 30000,
+      "category": "context_stress",
+      "source_task_id": "73",
+      "mapping_notes": "测试工具结果中的订单列表与后续指定订单之间的跨轮连续性，且不得重复退款。",
+      "expected_business_checks": [
+        {
+          "tool": "list_user_orders",
+          "result_keywords": ["success", "ORD-20240118-004"],
+          "arguments": {}
+        },
+        {
+          "tool": "query_order",
+          "result_keywords": ["success", "ORD-20240118-004", "审核中"],
+          "arguments": {"order_id": "ORD-20240118-004"}
+        }
+      ],
+      "context_facts": [
+        {"id": "selected_order", "content": "ORD-20240118-004", "introduced_at": 7, "required_at": [8], "critical": true},
+        {"id": "do_not_refund", "content": "不要再次提交退款", "introduced_at": 8, "required_at": [8], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 1, "expected_tools": ["list_user_orders"]},
+        {"turn_index": 7, "expected_tools": ["query_order"], "expected_arguments": {"order_id": "ORD-20240118-004"}},
+        {"turn_index": 8, "forbidden_tools": ["apply_refund"]}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["ORD-20240118-004"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_04",
+      "description": "退款意图经过多轮确认后才执行",
+      "turns": [
+        "我想处理订单 ORD-20240110-003 的售后问题。",
+        "商品是手机，我现在不太想要了。",
+        "请先告诉我这笔订单目前是否已经签收。",
+        "我还想确认一下退款原因应该怎么填写。",
+        "先不要提交申请，我需要考虑一下。",
+        "我确认要申请退款，原因是不想要了。",
+        "订单号还是 ORD-20240110-003，请按刚才的原因提交。",
+        "提交后告诉我预计处理时间。"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": ["ORD-20240110-003", "退款"],
+      "expected_requires_human": false,
+      "expected_tools": ["query_order", "apply_refund"],
+      "min_tool_calls": 2,
+      "max_tokens": 30000,
+      "category": "context_stress",
+      "source_task_id": "65",
+      "mapping_notes": "测试未确认前不执行退款，确认后使用正确订单和原因。",
+      "expected_business_checks": [
+        {
+          "tool": "apply_refund",
+          "result_keywords": ["success", "ORD-20240110-003"],
+          "arguments": {"order_id": "ORD-20240110-003", "reason": "不想要了"}
+        }
+      ],
+      "context_facts": [
+        {"id": "refund_order", "content": "ORD-20240110-003", "introduced_at": 1, "required_at": [3, 7], "critical": true},
+        {"id": "refund_reason", "content": "不想要了", "introduced_at": 6, "required_at": [7], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 5, "forbidden_tools": ["apply_refund"]},
+        {"turn_index": 6, "expected_tools": ["apply_refund"], "expected_arguments": {"order_id": "ORD-20240110-003", "reason": "不想要了"}}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["ORD-20240110-003"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_05",
+      "description": "用户更正订单号后必须使用新订单",
+      "turns": [
+        "我想查一下订单 ORD-20240115-001。",
+        "我刚才可能记错了订单号。",
+        "先帮我看看 Nike 运动鞋的基本信息。",
+        "这不是我最终要查的订单，刚才的订单号先不要使用。",
+        "正确订单号应该是 ORD-20240110-003。",
+        "这笔订单买的是什么？",
+        "请告诉我它的状态和金额。",
+        "不要再查询 ORD-20240115-001，只查更正后的订单。"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": ["ORD-20240110-003", "小米", "5999"],
+      "expected_requires_human": false,
+      "expected_tools": ["query_order"],
+      "min_tool_calls": 1,
+      "max_tokens": 30000,
+      "category": "context_stress",
+      "source_task_id": "69",
+      "mapping_notes": "测试旧订单事实被新订单事实覆盖。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": ["success", "ORD-20240110-003"],
+          "arguments": {"order_id": "ORD-20240110-003"}
+        }
+      ],
+      "context_facts": [
+        {"id": "old_order", "content": "ORD-20240115-001", "introduced_at": 1, "superseded_at": 5, "must_not_use_after": 5, "critical": true},
+        {"id": "new_order", "content": "ORD-20240110-003", "introduced_at": 5, "required_at": [6, 7, 8], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 6, "expected_tools": ["query_order"], "expected_arguments": {"order_id": "ORD-20240110-003"}, "forbidden_arguments": {"order_id": "ORD-20240115-001"}},
+        {"turn_index": 8, "forbidden_arguments": {"order_id": "ORD-20240115-001"}}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["ORD-20240110-003"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_06",
+      "description": "退款意图先取消后重新确认",
+      "turns": [
+        "订单 ORD-20240120-002 还没有发货，我考虑取消订单。",
+        "先帮我确认一下这笔订单里有什么商品。",
+        "我暂时不想退款，只是想了解取消规则。",
+        "如果取消，会不会影响后续重新下单？",
+        "先不要执行任何退款或取消操作。",
+        "我现在确认要取消订单并申请退款。",
+        "原因填写为下单错误，订单号仍然是 ORD-20240120-002。",
+        "请确认申请结果。"
+      ],
+      "expected_intent": "return_request",
+      "expected_keywords": ["ORD-20240120-002", "退款"],
+      "expected_requires_human": false,
+      "expected_tools": ["query_order", "apply_refund"],
+      "min_tool_calls": 2,
+      "max_tokens": 30000,
+      "category": "context_stress",
+      "source_task_id": "66",
+      "mapping_notes": "测试取消早期操作意图，直到后续明确确认后才申请退款。",
+      "expected_business_checks": [
+        {
+          "tool": "apply_refund",
+          "result_keywords": ["success", "ORD-20240120-002"],
+          "arguments": {"order_id": "ORD-20240120-002", "reason": "下单错误"}
+        }
+      ],
+      "context_facts": [
+        {"id": "refund_order", "content": "ORD-20240120-002", "introduced_at": 1, "required_at": [2, 7], "critical": true},
+        {"id": "refund_reason", "content": "下单错误", "introduced_at": 7, "required_at": [8], "critical": true},
+        {"id": "temporary_no_action", "content": "先不要执行退款或取消", "introduced_at": 5, "superseded_at": 6, "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 5, "forbidden_tools": ["apply_refund"]},
+        {"turn_index": 6, "expected_tools": ["apply_refund"], "expected_arguments": {"order_id": "ORD-20240120-002", "reason": "下单错误"}}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["ORD-20240120-002"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_07",
+      "description": "使用商品指代继续查询保护壳",
+      "turns": [
+        "我想了解一下 Apple AirPods Pro 2。",
+        "它的价格和主要功能是什么？",
+        "我比较关心续航和连接方式。",
+        "如果我还想买一个保护壳，应该选择什么？",
+        "先问一下退货政策，稍后再回到这个商品。",
+        "好的，回到刚才提到的商品。",
+        "它的保护壳价格和适配信息是多少？",
+        "请直接告诉我保护壳是否适配 AirPods Pro 2。"
+      ],
+      "expected_intent": "product_consult",
+      "expected_keywords": ["保护壳", "AirPods Pro 2"],
+      "expected_requires_human": false,
+      "expected_tools": ["query_product"],
+      "min_tool_calls": 1,
+      "max_tokens": 30000,
+      "category": "context_stress",
+      "source_task_id": "53",
+      "mapping_notes": "测试商品实体和代词指向在压缩后是否保持。",
+      "expected_business_checks": [
+        {
+          "tool": "query_product",
+          "result_keywords": ["success", "AirPods 保护壳"],
+          "arguments": {}
+        }
+      ],
+      "context_facts": [
+        {"id": "target_product", "content": "AirPods Pro 2", "introduced_at": 1, "required_at": [2, 4, 7, 8], "critical": true},
+        {"id": "target_accessory", "content": "AirPods 保护壳", "introduced_at": 4, "required_at": [7, 8], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 7, "expected_tools": ["query_product"], "expected_keywords": ["保护壳"]},
+        {"turn_index": 8, "expected_keywords": ["AirPods Pro 2"]}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["AirPods"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_08",
+      "description": "工具结果跨多轮保留并回答物流状态",
+      "turns": [
+        "请查询订单 ORD-20240115-001 的物流情况。",
+        "我先问一下顺丰一般多久送到。",
+        "暂时不用重新查询订单。",
+        "这个订单买的是什么商品？",
+        "我想确认一下之前查到的配送地点。",
+        "如果客服已经告诉过我物流状态，就直接根据之前结果回答。",
+        "请告诉我承运商和最新配送地点。",
+        "不要重复执行退款或其他操作。"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": ["退款", ["不重复", "没有提交"]],
+      "expected_requires_human": false,
+      "expected_tools": ["query_logistics", "query_order"],
+      "min_tool_calls": 1,
+      "max_tokens": 30000,
+      "category": "context_stress",
+      "source_task_id": "11",
+      "mapping_notes": "测试工具结果是否能作为后续上下文，而不是被无关问题覆盖。",
+      "expected_business_checks": [
+        {
+          "tool": "query_logistics",
+          "result_keywords": ["success", "顺丰速运"],
+          "arguments": {"order_id": "ORD-20240115-001"}
+        }
+      ],
+      "context_facts": [
+        {"id": "logistics_order", "content": "ORD-20240115-001", "introduced_at": 1, "required_at": [7], "critical": true},
+        {"id": "carrier", "content": "顺丰速运", "introduced_at": 1, "required_at": [7], "critical": true},
+        {"id": "latest_location", "content": "上海浦东区", "content_variants": ["上海市 浦东区", "浦东区"], "introduced_at": 1, "required_at": [7], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 1, "expected_tools": ["query_logistics"], "expected_arguments": {"order_id": "ORD-20240115-001"}},
+        {"turn_index": 7, "expected_keywords": ["顺丰", "上海浦东区"]},
+        {"turn_index": 8, "forbidden_tools": ["apply_refund"]}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["顺丰"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_09",
+      "description": "大量无关话题后查询待发货订单",
+      "turns": [
+        "我想了解一下戴森 V15 吸尘器。",
+        "它的续航和吸力分别是多少？",
+        "另外 AirPods 保护壳多少钱？",
+        "Levi's 501 现在有库存吗？",
+        "我还想知道已经发货的订单一般多久送达。",
+        "先不用回答商品问题，我要查一笔订单。",
+        "订单号是 ORD-20240122-005。",
+        "这笔订单目前是什么状态？",
+        "如果还没有发货，请说明订单中的商品和总金额。",
+        "最后只回答这笔订单，不要混入前面商品的信息。"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": ["ORD-20240122-005", "待发货", "戴森"],
+      "expected_requires_human": false,
+      "expected_tools": ["query_order"],
+      "min_tool_calls": 1,
+      "max_tokens": 35000,
+      "category": "context_stress",
+      "source_task_id": "25",
+      "mapping_notes": "通过多商品干扰和长历史强制触发当前消息条数压缩。",
+      "expected_business_checks": [
+        {
+          "tool": "query_order",
+          "result_keywords": ["success", "ORD-20240122-005"],
+          "arguments": {"order_id": "ORD-20240122-005"}
+        }
+      ],
+      "context_facts": [
+        {"id": "target_order", "content": "ORD-20240122-005", "introduced_at": 7, "required_at": [8, 9, 10], "critical": true},
+        {"id": "target_scope", "content": "最后只回答这笔订单", "content_variants": ["仅针对订单 ORD-20240122-005", "只回答订单 ORD-20240122-005", "仅说明 ORD-20240122-005", "这笔订单"], "introduced_at": 10, "required_at": [10], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 8, "expected_keywords": ["ORD-20240122-005", ["待发货", "未发货"]]},
+        {"turn_index": 10, "expected_keywords": ["ORD-20240122-005", "戴森"], "forbidden_arguments": {"order_id": "ORD-20240115-001"}}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["ORD-20240122-005"], "forbidden_summary_contains": []}
+    },
+    {
+      "id": "context_10",
+      "description": "商品咨询和订单查询交替进行后回到最终目标",
+      "turns": [
+        "先帮我看看 Nike Air Max 270 运动鞋的信息。",
+        "我关心价格、库存和颜色。",
+        "我还想查一笔已经发货的订单。",
+        "订单号是 ORD-20240115-001。",
+        "先暂停订单查询，我想继续问一下 Nike 鞋。",
+        "如果是黑色 42 码，价格是多少？",
+        "现在回到订单任务，告诉我这笔订单的物流承运商。",
+        "订单号仍然是 ORD-20240115-001。",
+        "请不要把商品咨询和订单物流混在一起。"
+      ],
+      "expected_intent": "order_query",
+      "expected_keywords": ["订单物流", ["分开", "不要混"]],
+      "expected_requires_human": false,
+      "expected_tools": ["query_product", "query_order", "query_logistics"],
+      "min_tool_calls": 2,
+      "max_tokens": 35000,
+      "category": "context_stress",
+      "source_task_id": "69",
+      "mapping_notes": "测试多个任务交替进行时，最终目标和实体是否正确恢复。",
+      "expected_business_checks": [
+        {
+          "tool": "query_logistics",
+          "result_keywords": ["success", "顺丰速运"],
+          "arguments": {"order_id": "ORD-20240115-001"}
+        }
+      ],
+      "context_facts": [
+        {"id": "product_topic", "content": "Nike Air Max 270 运动鞋", "introduced_at": 1, "required_at": [2, 6], "critical": false},
+        {"id": "order_topic", "content": "ORD-20240115-001", "introduced_at": 4, "required_at": [7, 8], "critical": true},
+        {"id": "final_task", "content": "查询订单物流承运商", "content_variants": ["物流承运商", "承运商是"], "introduced_at": 7, "required_at": [7], "critical": true}
+      ],
+      "turn_assertions": [
+        {"turn_index": 1, "expected_keywords": ["Nike", "Air Max"]},
+        {"turn_index": 7, "expected_keywords": ["ORD-20240115-001", "顺丰"]},
+        {"turn_index": 9, "expected_keywords": ["订单物流", ["分开", "不要混"]]}
+      ],
+      "compaction": {"required": true, "expected_summary_contains": ["ORD-20240115-001"], "forbidden_summary_contains": []}
+    }
+  ]
+}

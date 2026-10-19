@@ -54,8 +54,21 @@ class Settings(BaseSettings):
 
     # 多轮对话管理
     session_path: str = "app/sessions/session.json"
-    history_threshold: int = 10  # 消息压缩策略通常为上下文达到一定的token数，例如claude code通常为达到最大上下文窗口的70%左右，此处简略为原始消息条数超过10轮
-    history_keep_recent: int = 3  # 压缩时保留最近 3 条原始消息
+    history_threshold: int = 10  # 兼容旧配置；新的 Context 按预算触发
+    history_keep_recent: int = 3  # 兼容旧配置；新的 Context 使用自己的安全边界
+
+    # Session-scoped Context 压缩（参考 LCC s08，不属于长期 Memory）
+    context_enabled: bool = True
+    context_archive_dir: str = "app/sessions/context"
+    context_char_limit: int = 50000
+    context_target_ratio: float = 0.8
+    context_tool_batch_char_limit: int = 20000
+    context_large_result_char_limit: int = 6000
+    context_summary_input_char_limit: int = 60000
+    context_max_messages: int = 50
+    context_keep_recent_messages: int = 8
+    context_keep_recent_tool_results: int = 3
+    context_working_messages: int = 6
 
     model_config = {"env_file": ".env"}
 
