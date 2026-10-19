@@ -45,6 +45,10 @@ class VectorBackend(ABC):
         """按余弦相似度（或等价度量）返回 Top-K 命中。"""
 
     @abstractmethod
+    def list_chunks(self) -> list[Chunk]:
+        """返回当前索引中的全部 chunk，供词法检索建立内存索引。"""
+
+    @abstractmethod
     def size(self) -> int:
         """当前已索引的 chunk 数量。"""
 

@@ -144,6 +144,30 @@ class ChromaBackend(VectorBackend):
             self._size_cache = self._collection.count()
         return self._size_cache
 
+    def list_chunks(self) -> list[Chunk]:
+        if self._collection is None:
+            self.load()
+        result = self._collection.get(include=["documents", "metadatas"])
+        ids = result.get("ids", [])
+        documents = result.get("documents", [])
+        metadatas = result.get("metadatas", [])
+        chunks: list[Chunk] = []
+        for cid, doc_text, meta in zip(ids, documents, metadatas):
+            chunks.append(
+                Chunk(
+                    chunk_id=meta.get("chunk_id", cid),
+                    doc=meta.get("doc", ""),
+                    section=meta.get("section", ""),
+                    text=doc_text or "",
+                    parent_id=meta.get("parent_id", ""),
+                    section_path=json.loads(meta.get("section_path", "[]")),
+                    source=meta.get("source", ""),
+                    chunk_type=meta.get("chunk_type", "section"),
+                    chunking_version=meta.get("chunking_version", "legacy-h2-v1"),
+                )
+            )
+        return chunks
+
     def load(self) -> None:
         self._ensure_client()
         try:

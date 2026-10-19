@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 from app.agent.rag.backends.base import RetrievedChunk, VectorBackend
+from app.agent.rag.chunker import Chunk
 from app.agent.rag.embedder import Embedder
 
 __all__ = ["KnowledgeRetriever", "RetrievedChunk"]
@@ -51,3 +52,9 @@ class KnowledgeRetriever:
             self.load()
         q_vec = self._embedder.encode_one(query)
         return self._backend.search(q_vec, top_k=top_k)
+
+    def list_chunks(self) -> list[Chunk]:
+        """返回当前向量索引中的 chunk，供 HybridRetriever 建立 BM25 索引。"""
+        if not self._loaded:
+            self.load()
+        return self._backend.list_chunks()

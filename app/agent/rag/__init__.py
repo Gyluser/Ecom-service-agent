@@ -7,13 +7,20 @@
 from app.agent.rag.backends import NumpyBackend, RetrievedChunk, VectorBackend, create_backend
 from app.agent.rag.chunker import Chunk, chunk_markdown_dir
 from app.agent.rag.embedder import Embedder
+from app.agent.rag.hybrid import BM25Index, HybridRetriever, reciprocal_rank_fusion
 from app.agent.rag.retriever import KnowledgeRetriever
+from app.agent.rag.reranker import LocalCrossEncoderReranker, RerankedRetriever
 
 __all__ = [
     "Chunk",
     "chunk_markdown_dir",
     "Embedder",
     "KnowledgeRetriever",
+    "HybridRetriever",
+    "BM25Index",
+    "reciprocal_rank_fusion",
+    "LocalCrossEncoderReranker",
+    "RerankedRetriever",
     "RetrievedChunk",
     "VectorBackend",
     "NumpyBackend",

@@ -73,6 +73,11 @@ class NumpyBackend(VectorBackend):
             self.load()
         return len(self._chunks)
 
+    def list_chunks(self) -> list[Chunk]:
+        if not self._chunks:
+            self.load()
+        return list(self._chunks)
+
     def load(self) -> None:
         if not self._index_path.exists():
             raise FileNotFoundError(

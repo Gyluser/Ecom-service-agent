@@ -4,6 +4,7 @@
 - 保留 tests/test_rag.py 中最早的 4 条 Retriever 检索问题；
 - 保留已有的 15 条 τ-bench Retail 风格场景化用例；
 - 再新增 31 条不同场景的 τ-bench Retail 风格用例。
+- 额外新增 5 条当前知识库无法回答的 τ-bench Retail 风格问题。
 
 新增问题只借鉴 τ-bench 的自然口语、多目标和条件约束表达，业务事实与
 gold_evidence 仍完全以当前 Ecom rag_knowledge 文档为准。
@@ -21,7 +22,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_PATH = (
-    ROOT / "app" / "evaluation" / "rag" / "data" / "chunk_cases_50.json"
+    ROOT / "app" / "evaluation" / "rag" / "data" / "chunk_cases_100.json"
 )
 
 TAU_BENCH_REPOSITORY = "https://github.com/sierra-research/tau-bench"
@@ -55,18 +56,40 @@ def _case(
     gold_evidence: list[dict[str, Any]],
     requires_multi_chunk: bool,
     notes: str,
+    answerable: bool = True,
 ) -> dict[str, Any]:
     return {
         "id": case_id,
         "source_scope": source_scope,
         "query": query,
         "query_type": [query_type],
-        "answerable": True,
+        "answerable": answerable,
         "expected_docs": expected_docs,
         "gold_evidence": gold_evidence,
         "requires_multi_chunk": requires_multi_chunk,
         "notes": notes,
     }
+
+
+def _single_case(
+    case_id: str,
+    query: str,
+    query_type: str,
+    doc: str,
+    section_path: list[str],
+    text_anchor: str,
+    notes: str,
+) -> dict[str, Any]:
+    return _case(
+        case_id,
+        "tau_bench_expanded_100",
+        query,
+        query_type,
+        [doc],
+        [_evidence(doc, section_path, text_anchor)],
+        False,
+        notes,
+    )
 
 
 def build_project_original_cases() -> list[dict[str, Any]]:
@@ -815,6 +838,166 @@ def build_additional_tau_style_cases() -> list[dict[str, Any]]:
     ]
 
 
+def build_expanded_single_chunk_cases() -> list[dict[str, Any]]:
+    """新增 50 条单 chunk 用例：27 条困难样本和 23 条非直白表达。"""
+
+    member_level = ["并夕夕 会员权益", "一、会员等级体系"]
+    registered = ["并夕夕 会员权益", "二、各等级核心权益", "2.1 注册会员"]
+    silver = ["并夕夕 会员权益", "二、各等级核心权益", "2.2 白银会员"]
+    gold = ["并夕夕 会员权益", "二、各等级核心权益", "2.3 黄金会员"]
+    diamond = ["并夕夕 会员权益", "二、各等级核心权益", "2.4 钻石会员"]
+    points = ["并夕夕 会员权益", "三、积分体系"]
+    birthday = ["并夕夕 会员权益", "四、生日特权"]
+    no_reason = ["并夕夕 退换货政策", "一、七天无理由退货", "1.1 适用范围"]
+    excluded = ["并夕夕 退换货政策", "一、七天无理由退货", "1.2 不适用商品"]
+    return_freight = ["并夕夕 退换货政策", "一、七天无理由退货", "1.3 运费规则"]
+    quality_time = ["并夕夕 退换货政策", "二、质量问题退换货", "2.2 时效与运费"]
+    quality_proof = ["并夕夕 退换货政策", "二、质量问题退换货", "2.3 举证材料"]
+    refund_flow = ["并夕夕 退换货政策", "三、退款流程"]
+    only_refund = ["并夕夕 退换货政策", "四、特殊场景", "4.1 仅退款（不退货）"]
+    refuse_refund = ["并夕夕 退换货政策", "四、特殊场景", "4.2 拒收退款"]
+    partial_refund = ["并夕夕 退换货政策", "四、特殊场景", "4.3 部分退款"]
+    delivery_range = ["并夕夕 配送说明", "一、配送范围"]
+    delivery_time = ["并夕夕 配送说明", "二、配送时效"]
+    normal_freight = ["并夕夕 配送说明", "三、运费规则", "普通包邮规则"]
+    remote_freight = ["并夕夕 配送说明", "三、运费规则", "偏远地区与会员包邮例外"]
+    receiving = ["并夕夕 配送说明", "五、收货须知"]
+    delivery_issue = ["并夕夕 配送说明", "六、配送异常"]
+    q2 = ["并夕夕 常见问题 FAQ", "一、订单与支付", "Q2：支持哪些支付方式？"]
+    q3 = ["并夕夕 常见问题 FAQ", "一、订单与支付", "Q3：能否修改订单信息？"]
+    q5 = ["并夕夕 常见问题 FAQ", "二、商品与价格", "Q5：商品降价了能否退差价？"]
+    q7 = ["并夕夕 常见问题 FAQ", "二、商品与价格", "Q7：发现假货怎么办？"]
+    q9 = ["并夕夕 常见问题 FAQ", "三、售后服务", "Q9：退款多久到账？"]
+    q11 = ["并夕夕 常见问题 FAQ", "四、账户与安全", "Q11：忘记密码怎么办？"]
+    q13 = ["并夕夕 常见问题 FAQ", "四、账户与安全", "Q13：能否注销账户？"]
+    warranty_exception = ["华为硬件保修条款（评估语料）", "不承担三包责任的常见情况"]
+    turbo_new = ["华为笔记本 SuperTurbo 支持机型清单（评估语料）", "SuperTurbo 2.0/3.0 支持机型"]
+    turbo_old = ["华为笔记本 SuperTurbo 支持机型清单（评估语料）", "SuperTurbo 1.0 支持机型"]
+
+    cases = [
+        _single_case("tau100_001", "黄金会员寄偏远地区的大件，能包邮吗？", "paraphrase", "会员权益", gold, "不含偏远地区", "清楚询问黄金会员包邮的地区例外。"),
+        _single_case("tau100_002", "账户近一年实际消费刚过两万，这次往西部偏远地方寄一台洗衣机，账单仍显示配送费；这一档权益到底覆盖不覆盖？", "hard_negative", "会员权益", diamond, "全场包邮（含偏远地区）", "用消费门槛、目的地和大件场景替代钻石会员与包邮原词。"),
+        _single_case("tau100_003", "新账号第一次结账已经拖到一周多以后，原来给的那笔首单额度突然灰掉，是不是日期卡住了？", "hard_negative", "会员权益", registered, "注册 7 天内有效", "以首单额度和失效状态替代新人券、注册第八天等原词。"),
+        _single_case("tau100_004", "白银会员找客服时，比普通用户大概能少排多少队？", "paraphrase", "会员权益", silver, "普通通道前 30%", "询问有限客服优先权，不直接复述政策。"),
+        _single_case("tau100_005", "黄金会员寄新疆的小件，偏远地区那笔附加运费还要收吗？", "paraphrase", "配送说明", remote_freight, "加收 20 元起", "会员等级与偏远地区附加费的常见冲突。"),
+        _single_case("tau100_006", "黄金会员过生日，能领到那个专属礼盒吗？", "paraphrase", "会员权益", birthday, "限钻石会员", "区分黄金生日券与钻石生日礼盒。"),
+        _single_case("tau100_007", "账户里可转成结算权益的累计数明明够用，确认付款时却只释放成交额的一半；这个门槛卡的是存量，还是每次操作？", "hard_negative", "会员权益", points, "单笔最多抵扣订单金额的 50%", "以兑换关系、页面行为和限制对象描述积分抵扣上限。"),
+        _single_case("tau100_008", "衣服签收第八天才试穿，吊牌都在，还能按七天无理由退吗？", "paraphrase", "退换货政策", no_reason, "签收商品之日起 7 天内", "保留日期边界和商品完好条件。"),
+        _single_case("tau100_009", "刻了名字的保温杯没有用过，还能按普通退货处理吗？", "paraphrase", "退换货政策", excluded, "个人定制类商品", "定制品与未使用状态的规则冲突。"),
+        _single_case("tau100_010", "冷链海鲜还没拆封，当天不想要了，也能走七天无理由吗？", "paraphrase", "退换货政策", excluded, "鲜活易腐商品", "保持易腐商品例外，但不再刻意隐藏关键场景。"),
+        _single_case("tau100_011", "那串数字兑换码我先在页面确认过一次，后来没转给人也没实际消费；售后还能把它当作没用过处理吗？", "hard_negative", "退换货政策", excluded, "已激活的软件序列号、电子卡券", "用兑换码和确认动作替代电子卡券、激活等政策词。"),
+        _single_case("tau100_012", "已拆封的化妆品能七天无理由退吗？", "paraphrase", "退换货政策", excluded, "化妆品、内衣、贴身衣物（已拆封）", "清楚询问已拆封化妆品的无理由退货限制。"),
+        _single_case("tau100_013", "买方主动撤回一笔已经完成的交易，系统安排的回收环节产生费用后，最终金额会按什么路径抵掉？", "hard_negative", "退换货政策", return_freight, "运费 12 元起", "进一步使用交易撤回、回收环节和最终金额替代退货运费表达。"),
+        _single_case("tau100_014", "质量问题签收后超过15天还能退换吗？", "paraphrase", "退换货政策", quality_time, "签收后 15 天内", "清楚询问质量问题售后的时间边界。"),
+        _single_case("tau100_015", "不是外观损伤，而是设备在使用中偶尔失常。审核人员希望看到它从正常到异常的过程，除了静态图片还应补什么记录？", "hard_negative", "退换货政策", quality_proof, "故障演示视频", "以运行中偶发与连续呈现材料表达电子故障演示证据。"),
+        _single_case("tau100_016", "敏感商品昨晚提交退款，到今天中午还没审核，是不是要比普通订单慢？", "ambiguous", "退换货政策", refund_flow, "敏感商品 48 小时", "比较敏感商品与普通订单的审核时效。"),
+        _single_case("tau100_017", "订单还停在商家出库前，我没收到任何实物；售后页面应该走“要寄回东西”的那条，还是只处理款项？", "hard_negative", "退换货政策", only_refund, "商品未发货", "以订单阶段和售后页面分支替代仅退款、退货等直接词。"),
+        _single_case("tau100_018", "首轮派送没有完成，货物随后被送回出发地；消费者没有拿到物品时，原支付款项一般会经过哪段等待周期？", "hard_negative", "退换货政策", refuse_refund, "约 5-7 个工作日", "以派送未完成、回流和支付款项替代拒收退款的表面词。"),
+        _single_case("tau100_019", "同一笔下单里有几样东西，只有其中一件出了问题。我不想把整份交易都撤掉，平台会不会也只能整单处理？", "hard_negative", "退换货政策", partial_refund, "只退其中一件或几件", "以多商品交易中只处理一件的口语场景检索部分退款规则。"),
+        _single_case("tau100_020", "收货地址不在大陆范围内，平台会继续受理并安排这单吗？", "hard_negative", "配送说明", delivery_range, "港澳台及海外暂不直接发货", "以境外地址是否可继续履约表达配送范围限制。"),
+        _single_case("tau100_021", "我住县城，商家说能走次日达；不管是不是会员，这个承诺靠谱吗？", "hard_negative", "配送说明", delivery_time, "县级及以下", "地区与服务档位发生冲突。"),
+        _single_case("tau100_022", "我订的是定制衣柜，客服拿普通快递的四到七天跟我说事，这个时间表真能套用吗？", "hard_negative", "配送说明", delivery_time, "按详情页公示时效为准", "大件定制例外与通用时效冲突。"),
+        _single_case("tau100_023", "我买了刚好99元的小商品，订单拆成两个包裹后客服说每个都要收8块，这合理吗？", "hard_negative", "配送说明", normal_freight, "满 99 元包邮", "订单金额门槛与拆包裹场景干扰。"),
+        _single_case("tau100_024", "我只有境外信用卡，货到时再给现金也行，这两个办法总该能付上吧？", "hard_negative", "常见问题FAQ", q2, "暂不支持货到付款与境外信用卡", "两个替代支付方式都被排除。"),
+        _single_case("tau100_025", "同一家店同一颜色，昨天签收今天看到限时秒杀便宜了，我是钻石也不能补差吗？", "hard_negative", "常见问题FAQ", q5, "限时秒杀", "价保时限和会员权益满足，但活动类型例外。"),
+        _single_case("tau100_026", "包裹已经在路上了，我把门牌号写错一位，后台现在还能改吗？", "hard_negative", "常见问题FAQ", q3, "地址不可修改", "发货前可改地址这一相邻规则形成干扰。"),
+        _single_case("tau100_027", "外观没有磕碰，设备却在极端天气之后无法启动，保修期也还没结束；这类既非人为拆坏、也不是自身老化的情况会按普通免费处理吗？", "hard_negative", "华为硬件保修条款", warranty_exception, "因雷击", "自然事件与一般非人为故障之间的保修边界。"),
+        _single_case("tau100_028", "我最近不怎么买了，白银突然掉成注册会员，账上是按哪段消费重新看的？", "ambiguous", "会员权益", member_level, "近 12 个月内累计实付金额", "从等级变化反推滚动统计周期。"),
+        _single_case("tau100_029", "刚注册没多久，那张30块券我没找到入口；它是不是过几天就自己失效？", "paraphrase", "会员权益", registered, "注册 7 天内有效", "用找券场景间接询问新人券期限。"),
+        _single_case("tau100_030", "白银以后找人工，能不能少等点，不用像普通用户一样从头排？", "paraphrase", "会员权益", silver, "普通通道前 30%", "用排队体验询问客服权益。"),
+        _single_case("tau100_031", "黄金会员有专属客服直通通道吗？", "paraphrase", "会员权益", gold, "专属客服直通通道", "将原本过度隐含的表达改为清楚的会员权益咨询。"),
+        _single_case("tau100_032", "钻石会员的退货次数一年是怎么算的，普通不喜欢也能用在里面吗？", "paraphrase", "会员权益", diamond, "一年 4 次", "询问钻石专属无理由退货次数。"),
+        _single_case("tau100_033", "晒单拿的分我一直攒着，过两年再用会不会突然清空？", "paraphrase", "会员权益", points, "24 个月有效", "以长期不使用场景询问积分有效期。"),
+        _single_case("tau100_034", "生日那天那张88块的券，我是黄金，买一百多的东西能直接抵吗？", "paraphrase", "会员权益", birthday, "黄金及以上", "会员门槛和券面额以自然场景表达。"),
+        _single_case("tau100_035", "衣服是今天刚签收，水洗标和吊牌一点没动，我不喜欢的话走哪种退法？", "paraphrase", "退换货政策", no_reason, "不影响商品二次销售", "用商品完好状态间接询问适用范围。"),
+        _single_case("tau100_036", "质量问题申请退换货时，需要拍包装外观照片吗？", "paraphrase", "退换货政策", quality_proof, "包装外观照片", "清楚询问运输损坏责任所需的举证材料。"),
+        _single_case("tau100_037", "退货申请通过后我一直没把东西寄出，过了一天多还来得及吗？", "ambiguous", "退换货政策", refund_flow, "24 小时内审核", "以逾时寄回场景指向普通商品审核时限。"),
+        _single_case("tau100_038", "东西还没寄出但商家自己说缺货了，我能不能让钱直接按原路回来？", "paraphrase", "退换货政策", only_refund, "商品未发货", "用缺货后的退款诉求表达无需退货情形。"),
+        _single_case("tau100_039", "快递说已经放驿站了，我晚两天再去拿，会不会被退回？", "paraphrase", "配送说明", receiving, "48 小时内取件", "用代收点拖延取件场景表达时限。"),
+        _single_case("tau100_040", "物流整整三天没任何新消息，我应该先做什么，不是让客服一直干等吧？", "ambiguous", "配送说明", delivery_issue, "超过 3 天未更新轨迹", "以停滞物流场景指向异常处理。"),
+        _single_case("tau100_041", "我看到笔记本外箱已经破了，快递员还让我先收下再拍照，这种该怎么处理？", "paraphrase", "配送说明", receiving, "破损请直接拒收", "即时收货决策与快递员建议相冲突。"),
+        _single_case("tau100_042", "付款超过30分钟平台还没识别成功，联系客服时要提供哪些支付凭证？", "ambiguous", "常见问题FAQ", ["并夕夕 常见问题 FAQ", "一、订单与支付", "Q4：订单显示「已支付」但平台未识别怎么办？"], "支付凭证截图", "明确保留支付未识别的时长与材料条件。"),
+        _single_case("tau100_043", "卖光的耳机我不想天天搜，补货时能不能主动提醒我？", "paraphrase", "常见问题FAQ", ["并夕夕 常见问题 FAQ", "二、商品与价格", "Q6：商品页缺货怎么办？"], "到货提醒", "把功能名换成用户日常诉求。"),
+        _single_case("tau100_044", "我怀疑鞋是假货，但又怕拆了包装就没法申诉，提交入口到底在哪儿？", "paraphrase", "常见问题FAQ", q7, "鉴定为假货", "保留包装与假货申诉路径的自然表述。"),
+        _single_case("tau100_045", "用银行卡付的退款，商家那边已经显示退了，银行到账一般还要拖多久？", "paraphrase", "常见问题FAQ", q9, "3-7 个工作日", "支付方式决定到账时效。"),
+        _single_case("tau100_046", "旧手机号早注销了，登录页那个找回入口我还能用吗，要额外验什么？", "paraphrase", "常见问题FAQ", q11, "身份证照片+人脸认证申诉", "失效手机号触发额外账户找回材料。"),
+        _single_case("tau100_047", "账号里的券和积分还没用完，我现在就点注销会被拦吗？", "ambiguous", "常见问题FAQ", q13, "未使用的优惠券、积分", "注销前置条件采用生活化表达。"),
+        _single_case("tau100_048", "我这台 MateBook D 14 2024 的型号尾巴是 MDG，页面写的 SuperTurbo 2.0 真能用吗？", "paraphrase", "华为笔记本_SuperTurbo_支持机型清单", turbo_new, "MateBook D 14 2024 13 代酷睿", "型号代码与版本的交叉确认。"),
+        _single_case("tau100_049", "手上是 2020 年的 MateBook D 15，型号 BoB；装好系统后还能不能跑那个加速功能？", "paraphrase", "华为笔记本_SuperTurbo_支持机型清单", turbo_old, "MateBook D 15 2020", "年份、型号代码和旧版本支持表交织。"),
+        _single_case("tau100_050", "华为电脑送到非官方店拆机修过一次，后来又出故障，保修卡还在能按保修走吗？", "paraphrase", "华为硬件保修条款", warranty_exception, "非华为授权维修者", "保修凭证存在但非授权维修构成例外。"),
+    ]
+    if len(cases) != 50:
+        raise ValueError(f"新增单 chunk 用例应为 50 条，实际为 {len(cases)}")
+    if sum(case["query_type"] == ["hard_negative"] for case in cases) != 17:
+        raise ValueError("新增用例中 hard_negative 应为 17 条")
+    if any(case["requires_multi_chunk"] for case in cases):
+        raise ValueError("新增用例不能包含 multi-chunk")
+    return cases
+
+
+def build_unanswerable_tau_style_cases() -> list[dict[str, Any]]:
+    """新增 5 条 τ-bench 风格、但当前知识库无法回答的问题。"""
+
+    scope = "tau_bench_unanswerable"
+    return [
+        _case(
+            "tau_unanswerable_001",
+            scope,
+            "我在直播间买的东西想改成公司抬头的增值税专票，还要把一单拆成两张，这个能直接帮我开吗？",
+            "unanswerable",
+            [],
+            [],
+            False,
+            "当前 Ecom 知识库没有直播间订单、发票抬头或拆票规则，不能从现有政策推出答案。",
+            False,
+        ),
+        _case(
+            "tau_unanswerable_002",
+            scope,
+            "黄金会员攒的积分能不能换高铁票？如果可以，兑换比例和每个月最多换几张有人知道吗？",
+            "unanswerable",
+            [],
+            [],
+            False,
+            "当前会员文档只说明积分获取、抵扣和有效期，不包含高铁票兑换或兑换上限。",
+            False,
+        ),
+        _case(
+            "tau_unanswerable_003",
+            scope,
+            "我想把退款改成平台余额，平台余额到账会不会多送一点积分，月底前不用掉会不会再加倍？",
+            "unanswerable",
+            [],
+            [],
+            False,
+            "当前退款和会员文档没有平台余额返积分、余额加倍或类似活动规则。",
+            False,
+        ),
+        _case(
+            "tau_unanswerable_004",
+            scope,
+            "华为平板进水后完全开不了机，能不能安排上门取件、先借我一台备用机，再提前报个维修价？",
+            "unanswerable",
+            [],
+            [],
+            False,
+            "当前华为保修文档说明进液等责任例外和维修预约，但没有上门取件、备用机或预报价承诺。",
+            False,
+        ),
+        _case(
+            "tau_unanswerable_005",
+            scope,
+            "我想把一个订单改成朋友代收，快递到了以后让他凭身份证取，平台能不能顺便把收货人和手机号一起改掉？",
+            "unanswerable",
+            [],
+            [],
+            False,
+            "当前配送文档没有代收授权、身份核验或修改收货人手机号的规则。",
+            False,
+        ),
+    ]
+
+
 def build_payload() -> dict[str, Any]:
     original_cases = build_project_original_cases()
     if len(original_cases) != 4:
@@ -828,9 +1011,10 @@ def build_payload() -> dict[str, Any]:
     if len(additional_cases) != 31:
         raise ValueError(f"新增 τ-bench 风格用例应为 31 条，实际为 {len(additional_cases)}")
 
-    cases = original_cases + tau_style_cases + additional_cases
-    if len(cases) != 50:
-        raise ValueError(f"合并后应为 50 条，实际为 {len(cases)}")
+    expanded_cases = build_expanded_single_chunk_cases()
+    cases = original_cases + tau_style_cases + additional_cases + expanded_cases
+    if len(cases) != 100:
+        raise ValueError(f"合并后应为 100 条，实际为 {len(cases)}")
 
     ids = [case["id"] for case in cases]
     if len(ids) != len(set(ids)):
@@ -840,14 +1024,14 @@ def build_payload() -> dict[str, Any]:
         raise ValueError("用例 query 存在重复")
 
     return {
-        "dataset": "Ecom RAG chunk-level retrieval evaluation: 4 project-original + 46 tau-bench-style",
-        "description": "保留项目最早的 4 条检索问题、已有的 15 条 τ-bench 风格问题，再新增 31 条口语化、多目标和多约束场景。只评估 Retriever，不调用 Agent 循环。",
+        "dataset": "Ecom RAG chunk-level retrieval evaluation: 50 original + 50 tau-bench-style single-chunk cases",
+        "description": "保留原有 50 条可回答问题，再新增 50 条单 chunk、口语化和条件约束更强的 τ-bench 风格问题，其中 27 条为困难样本。只评估 Retriever，不调用 Agent 循环。",
         "source_policy": "τ-bench 风格问题只借鉴自然表达、条件约束、偏好和多目标结构；所有业务事实与 gold_evidence 均以当前 Ecom rag_knowledge 为准，不照抄 chunk 标题或官方问答口吻。",
         "benchmark_reference": {
             "repository": TAU_BENCH_REPOSITORY,
             "retail_tasks": TAU_BENCH_TASKS,
         },
-        "metrics_scope": "answerable-only Recall@1（仅35条单证据查询）、All-query Recall@1（辅助）、Hit@1/3/5/10、Recall@3/5/10",
+        "metrics_scope": "Recall@1（仅单证据查询）、All-query Recall@1（辅助）、Hit@1/3/5/10、Recall@3/5/10；全部 100 条均为可回答问题。",
         "cases": cases,
     }
 

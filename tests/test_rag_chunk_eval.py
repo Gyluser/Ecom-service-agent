@@ -1,4 +1,4 @@
-"""50 条评估集的 Retriever-only chunk 级 RAG 评测。
+"""100 条评估集的 Retriever-only chunk 级 RAG 评测。
 
 用法：
   ..\learn-claude-code\LCC\Scripts\python.exe tests\test_rag_chunk_eval.py --backend numpy
@@ -25,27 +25,31 @@ sys.path.insert(0, str(ROOT))
 from app.agent.rag.backends import create_backend  # noqa: E402
 from app.agent.rag.chunker import CHUNKING_VERSION, Chunk, chunk_markdown_dir  # noqa: E402
 from app.agent.rag.embedder import Embedder  # noqa: E402
+from app.agent.rag.hybrid import HybridRetriever  # noqa: E402
 from app.agent.rag.retriever import KnowledgeRetriever  # noqa: E402
+from app.agent.rag.reranker import LocalCrossEncoderReranker, RerankedRetriever  # noqa: E402
 from app.config.settings import settings  # noqa: E402
 
-CASES_PATH = ROOT / "app" / "evaluation" / "rag" / "data" / "chunk_cases_50.json"
+CASES_PATH = ROOT / "app" / "evaluation" / "rag" / "data" / "chunk_cases_100.json"
 KB_DIR = ROOT / "app" / "evaluation" / "rag" / "rag_knowledge"
 INDEX_PATH = ROOT / "app" / "evaluation" / "rag" / "rag_index" / "kb_index.json"
 CHROMA_DIR = ROOT / "app" / "evaluation" / "rag" / "rag_index" / "chroma"
 RESULT_DIR = ROOT / "app" / "evaluation" / "rag" / "rag_result"
 TOP_K = 10
 METRIC_KS = (1, 3, 5, 10)
+HYBRID_CANDIDATE_K = 10
 LEAKAGE_MARKERS = ("检索测试问题", "测试问题示例")
 EXPECTED_SOURCE_COUNTS = {
     "project_original": 4,
     "tau_bench_adapted": 15,
     "tau_bench_expanded": 31,
+    "tau_bench_expanded_100": 50,
 }
 EXPECTED_TYPE_COUNTS = {
     "direct": 4,
-    "paraphrase": 14,
-    "ambiguous": 4,
-    "hard_negative": 13,
+    "paraphrase": 41,
+    "ambiguous": 10,
+    "hard_negative": 30,
     "multi_chunk": 15,
 }
 
@@ -62,17 +66,19 @@ def _load_cases() -> list[dict[str, Any]]:
     payload = json.loads(CASES_PATH.read_text(encoding="utf-8"))
     cases = payload.get("cases")
     if not isinstance(cases, list):
-        raise ValueError("chunk_cases_50.json 缺少 cases 列表")
-    if len(cases) != 50:
-        raise ValueError(f"测试集数量应为 50，实际为 {len(cases)}")
+        raise ValueError("chunk_cases_100.json 缺少 cases 列表")
+    if len(cases) != 100:
+        raise ValueError(f"测试集数量应为 100，实际为 {len(cases)}")
 
     ids = [case.get("id") for case in cases]
     if len(set(ids)) != len(ids):
         raise ValueError("测试集 id 存在重复")
-    if any(case.get("answerable") is not True for case in cases):
-        raise ValueError("当前评估集只能包含 answerable=true 用例")
-    if any("unanswerable" in case.get("query_type", []) for case in cases):
-        raise ValueError("当前评估集不允许包含 unanswerable 类型")
+    for case in cases:
+        is_unanswerable = "unanswerable" in case.get("query_type", [])
+        if is_unanswerable and case.get("answerable") is not False:
+            raise ValueError(f"{case.get('id')} 的 unanswerable 用例必须 answerable=false")
+        if not is_unanswerable and case.get("answerable") is not True:
+            raise ValueError(f"{case.get('id')} 的可回答用例必须 answerable=true")
 
     source_counts = Counter(case["source_scope"] for case in cases)
     if dict(source_counts) != EXPECTED_SOURCE_COUNTS:
@@ -108,6 +114,15 @@ def _load_cases() -> list[dict[str, Any]]:
         missing = required_fields - set(case)
         if missing:
             raise ValueError(f"{case.get('id')} 缺少字段：{sorted(missing)}")
+        is_unanswerable = "unanswerable" in case["query_type"]
+        if is_unanswerable:
+            if case["expected_docs"] or case["gold_evidence"]:
+                raise ValueError(
+                    f"{case['id']} 的无法回答用例不能包含 expected_docs 或 gold_evidence"
+                )
+            if case["requires_multi_chunk"]:
+                raise ValueError(f"{case['id']} 的无法回答用例不能要求多 chunk")
+            continue
         if not case["gold_evidence"]:
             raise ValueError(f"{case['id']} 没有 gold_evidence")
         is_multi_gold = len(case["gold_evidence"]) > 1
@@ -230,6 +245,9 @@ def _validate_corpus_and_gold(
 
     gold_ids: dict[str, set[str]] = {}
     for case in cases:
+        if not case["answerable"]:
+            gold_ids[case["id"]] = set()
+            continue
         case_gold: set[str] = set()
         for evidence in case["gold_evidence"]:
             matches = _match_evidence(chunks, evidence)
@@ -244,7 +262,14 @@ def _validate_corpus_and_gold(
     return gold_ids
 
 
-def _metrics_for_ranks(relevant: list[bool], gold_count: int) -> dict[str, Any]:
+def _metrics_for_ranks(
+    relevant: list[bool], gold_count: int, answerable: bool
+) -> dict[str, Any]:
+    if not answerable:
+        metrics = {f"Recall@{k}": None for k in METRIC_KS}
+        metrics.update({f"Hit@{k}": None for k in METRIC_KS})
+        metrics["supplementary_metrics"] = {"All-query Recall@1": None}
+        return metrics
     retrieved_relevant = {k: sum(relevant[:k]) for k in METRIC_KS}
     recalls = {
         k: retrieved_relevant[k] / gold_count if gold_count else 0.0
@@ -269,8 +294,11 @@ def _average_metric(case_results: list[dict[str, Any]], key: str) -> float | Non
 
 
 def _average_metrics(case_results: list[dict[str, Any]]) -> dict[str, Any]:
+    answerable_results = [item for item in case_results if item["answerable"]]
     single_evidence_results = [
-        item for item in case_results if not item["requires_multi_chunk"]
+        item
+        for item in answerable_results
+        if not item["requires_multi_chunk"]
     ]
     metrics: dict[str, Any] = {}
     for k in METRIC_KS:
@@ -281,21 +309,21 @@ def _average_metrics(case_results: list[dict[str, Any]]) -> dict[str, Any]:
             )
         else:
             metrics[f"Recall@{k}"] = _average_metric(
-                case_results,
+                answerable_results,
                 f"Recall@{k}",
             )
     for k in METRIC_KS:
-        metrics[f"Hit@{k}"] = _average_metric(case_results, f"Hit@{k}")
+        metrics[f"Hit@{k}"] = _average_metric(answerable_results, f"Hit@{k}")
     metrics["supplementary_metrics"] = {
         "All-query Recall@1": round(
             sum(
                 item["metrics"]["supplementary_metrics"]["All-query Recall@1"]
-                for item in case_results
+                for item in answerable_results
             )
-            / len(case_results),
+            / len(answerable_results),
             4,
         )
-        if case_results
+        if answerable_results
         else None
     }
     return metrics
@@ -336,7 +364,11 @@ def _run_cases(
         result = {
             **case,
             "retrieved_chunks": retrieved_chunks,
-            "metrics": _metrics_for_ranks(relevant_flags, len(gold_ids[case["id"]])),
+            "metrics": _metrics_for_ranks(
+                relevant_flags,
+                len(gold_ids[case["id"]]),
+                case["answerable"],
+            ),
         }
         results.append(result)
     return results
@@ -367,19 +399,58 @@ def _save_report(report: dict[str, Any]) -> Path:
     return output
 
 
-def run(backend_name: str) -> Path:
+def _make_pipeline(
+    pipeline_name: str,
+    retriever: KnowledgeRetriever,
+    chunks: list[Chunk],
+    reranker_model: str | None,
+):
+    if pipeline_name == "baseline":
+        return retriever
+
+    hybrid = HybridRetriever(
+        retriever,
+        chunks,
+        candidate_k=HYBRID_CANDIDATE_K,
+    )
+    if pipeline_name == "hybrid":
+        return hybrid
+    if pipeline_name == "hybrid-rerank":
+        if not reranker_model:
+            raise ValueError(
+                "pipeline=hybrid-rerank 必须提供 --reranker-model 本地模型目录"
+            )
+        reranker = LocalCrossEncoderReranker(
+            reranker_model,
+            device=settings.embedding_device,
+        )
+        return RerankedRetriever(
+            hybrid,
+            reranker,
+            candidate_k=HYBRID_CANDIDATE_K,
+        )
+    raise ValueError(f"未知 pipeline: {pipeline_name}")
+
+
+def run(
+    backend_name: str,
+    pipeline_name: str = "baseline",
+    reranker_model: str | None = None,
+) -> Path:
     cases = _load_cases()
     chunks = chunk_markdown_dir(KB_DIR)
     if not chunks:
         raise ValueError("评估知识库没有生成 chunk")
     gold_ids = _validate_corpus_and_gold(cases, chunks)
     retriever, index_action = _prepare_retriever(backend_name, chunks)
-    results = _run_cases(cases, gold_ids, retriever)
+    pipeline = _make_pipeline(pipeline_name, retriever, chunks, reranker_model)
+    results = _run_cases(cases, gold_ids, pipeline)
 
     report = {
-        "test": "ecom_rag_chunk_eval_50",
+        "test": "ecom_rag_chunk_eval_100",
         "started_at": _now_beijing().isoformat(),
         "backend": backend_name,
+        "pipeline": pipeline_name,
         "top_k": TOP_K,
         "agent_loop": False,
         "index_action": index_action,
@@ -398,8 +469,8 @@ def run(backend_name: str) -> Path:
         },
         "summary": {
             "total_queries": len(results),
-            "answerable_queries": len(results),
-            "unanswerable_queries": 0,
+            "answerable_queries": sum(item["answerable"] for item in results),
+            "unanswerable_queries": sum(not item["answerable"] for item in results),
             "metrics": _average_metrics(results),
         },
         "by_source_scope": _group_summary(results, "source_scope"),
@@ -413,10 +484,20 @@ def run(backend_name: str) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="50 条 RAG chunk-level Retriever 评测")
+    parser = argparse.ArgumentParser(description="100 条 RAG chunk-level Retriever 评测")
     parser.add_argument("--backend", choices=["numpy", "chroma"], default="numpy")
+    parser.add_argument(
+        "--pipeline",
+        choices=["baseline", "hybrid", "hybrid-rerank"],
+        default="baseline",
+    )
+    parser.add_argument(
+        "--reranker-model",
+        default=None,
+        help="hybrid-rerank 使用的本地 Cross-Encoder 模型目录",
+    )
     args = parser.parse_args()
-    run(args.backend)
+    run(args.backend, args.pipeline, args.reranker_model)
 
 
 if __name__ == "__main__":
