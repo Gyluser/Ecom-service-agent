@@ -16,23 +16,24 @@ def set_memory_manager(manager: MemoryManager) -> None:
     _memory_manager = manager
 
 
-def recall_user_memory(query: str = "") -> dict:
+def recall_user_memory(query: str = "", memory_manager: MemoryManager | None = None) -> dict:
     """查询当前用户的记忆信息（长期记忆和短期记忆）。"""
-    if _memory_manager is None or not _memory_manager.memory_enabled:
+    manager = memory_manager or _memory_manager
+    if manager is None or not manager.memory_enabled:
         return {"success": False, "error": "记忆系统未启用"}
 
-    long_term_facts = _memory_manager.recall(query)
+    long_term_facts = manager.recall(query)
     result: dict = {
         "success": True,
-        "short_term_facts": _memory_manager.stm.facts,
+        "short_term_facts": manager.stm.facts,
         "long_term_facts": long_term_facts,
         "retrieved_memory_ids": [item["memory_id"] for item in long_term_facts],
-        "retrieval": _memory_manager.last_retrieval,
+        "retrieval": manager.last_retrieval,
     }
 
-    if _memory_manager.ltm.interaction_summaries:
+    if manager.ltm.interaction_summaries:
         result["recent_interactions"] = [
-            s["summary"] for s in _memory_manager.ltm.interaction_summaries[-3:]
+            s["summary"] for s in manager.ltm.interaction_summaries[-3:]
         ]
 
     return result

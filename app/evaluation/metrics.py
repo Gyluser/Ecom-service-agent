@@ -17,8 +17,10 @@ LLM judge 仿照 app/agent/memory/extraction.py 的「格式化 → 调用 LLM �
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-from openai import OpenAI
+if TYPE_CHECKING:
+    from openai import OpenAI
 
 from app.prompts.evaluation import (
     ANSWER_QUALITY_PROMPT,
@@ -131,6 +133,21 @@ def requires_human_match(expected: bool | None, actual: bool) -> float | None:
     if expected is None:
         return None
     return 1.0 if expected == actual else 0.0
+
+
+def task_success(
+    tool_score: float | None,
+    argument_score: float | None,
+    human_score: float | None,
+) -> float | None:
+    """业务任务是否完成，仅看执行层，不混入意图、回答表达或 token 成本。
+
+    有任何已声明的执行断言不通过即为 0；用例没有执行断言时返回 None。
+    """
+    checks = [score for score in (tool_score, argument_score, human_score) if score is not None]
+    if not checks:
+        return None
+    return 1.0 if all(score >= 1.0 for score in checks) else 0.0
 
 
 # ============================================================

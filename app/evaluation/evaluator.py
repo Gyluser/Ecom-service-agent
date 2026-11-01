@@ -30,6 +30,7 @@ class EvalResult:
     # ---------- 过程指标 ----------
     tool_accuracy: float | None = None
     business_state_accuracy: float | None = None
+    task_success: float | None = None
     tool_efficiency: float | None = None
     token_cost: int = 0
     token_pass: bool | None = None
@@ -43,6 +44,7 @@ class EvalResult:
     requires_human_match: float | None = None
     answer_quality: float | None = None  # judge 1-5 归一化到 0-1
     faithfulness: float | None = None  # 1.0 忠实 / 0.0 幻觉
+    response_quality_score: float | None = None
 
     # ---------- 汇总 ----------
     process_score: float | None = None
@@ -153,6 +155,16 @@ class Evaluator:
                 res.process_soundness = p_score / 5.0 if p_score else None
                 res.judge_reasons["process_soundness"] = p_reason
 
+            # ---------- 四层独立指标 ----------
+            # 任务成功只考察业务动作是否完成，不能把意图或自然语言表达混进来。
+            res.task_success = metrics.task_success(
+                res.tool_accuracy, res.business_state_accuracy, res.requires_human_match
+            )
+            res.response_quality_score = _avg([
+                res.keyword_coverage, res.requires_human_match,
+                res.answer_quality, res.faithfulness,
+            ])
+
             # ---------- 汇总 ----------
             res.process_score = _avg([
                 res.tool_accuracy, res.tool_efficiency,
@@ -212,7 +224,11 @@ class Evaluator:
             "total": total,
             "passed": passed,
             "pass_rate": passed / total if total else 0.0,
-            "task_success_rate": passed / total if total else 0.0,
+            "task_success_rate": _avg([r.task_success for r in results]),
+            "intent_accuracy": _avg([r.intent_match for r in results]),
+            "tool_selection_accuracy": _avg([r.tool_accuracy for r in results]),
+            "tool_argument_accuracy": _avg([r.business_state_accuracy for r in results]),
+            "response_quality": _avg([r.response_quality_score for r in results]),
             "avg_process_score": _avg([r.process_score for r in results]),
             "avg_result_score": _avg([r.result_score for r in results]),
             "total_tokens": total_tokens,
@@ -232,6 +248,7 @@ class Evaluator:
             "process": {
                 "tool_accuracy": r.tool_accuracy,
                 "business_state_accuracy": r.business_state_accuracy,
+                "task_success": r.task_success,
                 "tool_efficiency": r.tool_efficiency,
                 "token_cost": r.token_cost,
                 "token_pass": r.token_pass,
@@ -246,6 +263,7 @@ class Evaluator:
                 "requires_human_match": r.requires_human_match,
                 "answer_quality": r.answer_quality,
                 "faithfulness": r.faithfulness,
+                "response_quality_score": r.response_quality_score,
                 "result_score": r.result_score,
             },
             "overall_score": r.overall_score,

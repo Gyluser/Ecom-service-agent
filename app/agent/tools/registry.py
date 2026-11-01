@@ -185,13 +185,16 @@ TOOL_DEFINITIONS: list[dict] = [
 ]
 
 
-def execute_tool(name: str, arguments: dict) -> str:
+def execute_tool(name: str, arguments: dict, *, memory_manager=None) -> str:
     """根据工具名称分发执行，返回 JSON 字符串结果。"""
     func = _TOOL_MAP.get(name)
     if not func:
         return json.dumps({"error": f"未知工具: {name}"}, ensure_ascii=False)
     try:
-        result = func(**arguments)
+        if name == "recall_user_memory":
+            result = func(**arguments, memory_manager=memory_manager)
+        else:
+            result = func(**arguments)
     except Exception as e:
         result = {"error": f"工具执行出错: {e}"}
     return json.dumps(result, ensure_ascii=False)

@@ -5,6 +5,8 @@ from typing import Optional
 from openai import OpenAI
 
 from app.agent.context import ContextManager
+from app.agent.intent_fusion import IntentDecision, IntentFusionClassifier
+from app.agent.rag.embedder import Embedder
 from app.agent.storage import delete_session, load_session, save_session
 from app.config.settings import settings
 from app.prompts.customer_service import SYSTEM_PROMPT
@@ -15,13 +17,22 @@ from app.agent.tools.manager import ToolManager
 class EcomAgent:
     """电商客服 Agent —— 第八期：Skill 可复用能力模块"""
 
-    def __init__(self, session_path: Optional[str] = None):
+    def __init__(
+        self,
+        session_path: Optional[str] = None,
+        user_id: Optional[str] = None,
+        memory_dir: Optional[str] = None,
+        context_archive_dir: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ):
         self.client = OpenAI(
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url,
         )
         self.model = settings.model_name
         self.temperature = settings.temperature
+        self.user_id = user_id or settings.memory_user_id
+        self.session_id = session_id
         self.session_path = session_path or settings.session_path
         self.history_threshold = settings.history_threshold
         self.history_keep_recent = settings.history_keep_recent
@@ -29,7 +40,7 @@ class EcomAgent:
         self.context_manager = ContextManager(
             client=self.client,
             model=self.model,
-            archive_dir=settings.context_archive_dir,
+            archive_dir=context_archive_dir or settings.context_archive_dir,
             char_limit=settings.context_char_limit,
             target_ratio=settings.context_target_ratio,
             tool_batch_char_limit=settings.context_tool_batch_char_limit,
@@ -50,15 +61,14 @@ class EcomAgent:
         self.memory_manager = MemoryManager(
             client=self.client,
             model=self.model,
-            user_id=settings.memory_user_id,
-            memory_dir=settings.memory_dir,
+            user_id=self.user_id,
+            memory_dir=memory_dir or settings.memory_dir,
             memory_enabled=settings.memory_enabled,
             max_ltm_facts=settings.max_ltm_facts,
         )
 
         if settings.memory_enabled:
-            from app.agent.tools.memory_tool import set_memory_manager
-            set_memory_manager(self.memory_manager)
+            self.tool_manager.set_memory_manager(self.memory_manager)
 
         from app.agent.skills import SkillManager
         self.skill_manager = SkillManager(
@@ -80,6 +90,7 @@ class EcomAgent:
         # 对外的 intent 表示用户最终目标；该字段只记录本轮最近一次工具动作，
         # 不写入 CustomerServiceResponse，避免把“查订单”误当成“退款”等最终意图。
         self._current_turn_action: Optional[str] = None
+        self.intent_classifier = self._build_intent_classifier()
 
         loaded = load_session(self.session_path)
         if loaded:
@@ -88,6 +99,28 @@ class EcomAgent:
             self._current_turn_start = len(self.raw_messages)
             if loaded.get("short_term_memory"):
                 self.memory_manager.restore_stm(loaded["short_term_memory"])
+
+    def _build_intent_classifier(self) -> IntentFusionClassifier:
+        """构建三路意图分类器；Embedding 故障会在分类器内安全降级。"""
+        encoder = None
+        if settings.intent_embedding_enabled:
+            try:
+                encoder = Embedder(
+                    api_key=settings.openai_api_key,
+                    base_url=settings.openai_base_url,
+                    model=settings.embedding_model,
+                    backend=settings.embedding_backend,
+                    model_path=settings.embedding_model_path,
+                    device=settings.embedding_device,
+                )
+            except Exception:
+                encoder = None
+        return IntentFusionClassifier(
+            encoder=encoder,
+            llm_weight=settings.intent_llm_weight,
+            embedding_weight=settings.intent_embedding_weight,
+            pattern_weight=settings.intent_pattern_weight,
+        )
 
     @property
     def history_size(self) -> int:
@@ -365,10 +398,13 @@ class EcomAgent:
         """直接解析最终回复，避免再发起一次结构化提取模型调用。"""
         data = self._extract_json_object(text)
         if data is not None:
-            model_intent = self._normalize_intent(data.get("intent"))
-            data["intent"] = self._resolve_primary_intent(
-                self._current_user_text(), model_intent
-            ).value
+            raw_intent = data.get("intent")
+            model_intent = self._normalize_intent(raw_intent) if raw_intent else None
+            decision = self._resolve_primary_intent(
+                self._current_user_text(), model_intent, data.get("confidence")
+            )
+            data["intent"] = decision.intent.value
+            data["confidence"] = decision.confidence
             try:
                 return CustomerServiceResponse.model_validate(data)
             except Exception:
@@ -387,59 +423,15 @@ class EcomAgent:
         self,
         user_text: str,
         model_intent: str | None,
-    ) -> IntentType:
-        """把 intent 固定解释为用户最终目标，并纠正模型受当前动作影响的判断。
-
-        例如“我想退款，先帮我查订单”中，query_order 是当前动作，
-        return_request 才是对外返回的最终意图。这里仅做本地规则修正，
-        不增加额外的 LLM 调用。
-        """
-        text = user_text.lower()
-
-        # 投诉/举报是明确的最终目标，应优先于普通售后或订单查询。
-        if any(word in text for word in (
-            "投诉", "消协", "举报", "赔偿", "欺骗", "垃圾",
-        )):
-            return IntentType.COMPLAINT
-
-        # 退款进度、已申请退款等也是退款目标，即使当前动作只是查订单。
-        if any(word in text for word in (
-            "想退", "申请退款", "办理退款", "退掉订单", "退货退款",
-            "退款进度", "退款状态", "退款处理中", "已经申请退款",
-            "退货", "退款", "换货", "退换",
-        )):
-            return IntentType.RETURN_REQUEST
-
-        # 恢复已取消订单是 Ecom 当前不支持的售后/人工场景。
-        if any(word in text for word in (
-            "撤销取消", "恢复配送", "恢复订单", "取消后恢复",
-            "恢复已取消", "撤销已取消",
-        )):
-            return IntentType.AFTER_SALE
-
-        # 明确的订单查询动作优先于同一句中的商品词；这是当前动作和最终
-        # 目标一致时的正常情况，也能避免“订单状态和商品信息”被判成商品咨询。
-        if (
-            any(word in text for word in (
-                "列出订单", "所有订单", "订单状态", "订单详情",
-                "查询订单", "看一下订单", "查一下订单",
-            ))
-            or re.search(r"ord-\d{8}-\d{3}", text, re.I)
-        ):
-            return IntentType.ORDER_QUERY
-
-        if any(word in text for word in (
-            "商品价格", "商品库存", "商品规格", "有没有货",
-        )):
-            return IntentType.PRODUCT_CONSULT
-
-        if model_intent:
-            try:
-                return IntentType(model_intent)
-            except ValueError:
-                pass
-
-        return IntentType.OTHER
+        model_confidence: object | None = None,
+    ) -> IntentDecision:
+        """用 LLM、Embedding、Pattern 三路分数输出用户最终目标。"""
+        normalized = self._normalize_intent(model_intent) if model_intent else ""
+        try:
+            llm_intent = IntentType(normalized)
+        except ValueError:
+            llm_intent = None
+        return self.intent_classifier.classify(user_text, llm_intent, model_confidence)
 
     @staticmethod
     def _extract_json_object(text: str) -> dict | None:
@@ -498,7 +490,7 @@ class EcomAgent:
             word in user_text
             for word in ("转人工", "人工客服", "人工处理", "超出能力", "无法处理")
         )
-        intent = self._resolve_primary_intent(user_text, intent.value)
+        intent = self._resolve_primary_intent(user_text, intent.value).intent
         if (
             intent == IntentType.OTHER
             and any(word in user_text for word in ("你好", "您好", "嗨", "hello", "hi", "在吗"))

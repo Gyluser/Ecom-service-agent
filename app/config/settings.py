@@ -21,9 +21,21 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_model_path: str = ""
     embedding_device: str = "cpu"
+    # 意图分类：复用 RAG 的 Embedding 配置。关闭时仍保留 LLM + Pattern 两路。
+    intent_embedding_enabled: bool = True
+    intent_llm_weight: float = 0.30
+    intent_embedding_weight: float = 0.25
+    intent_pattern_weight: float = 0.45
     kb_dir: str = "app/agent/rag/knowledge"
     # 向量后端：numpy（手写余弦，教学透明，零依赖，默认）/ chroma（向量数据库，生产代表，需 pip install chromadb）
     rag_backend: str = "numpy"
+    # 线上检索链路：dense / hybrid / hybrid-rerank。
+    # hybrid = Dense + BM25 + RRF；hybrid-rerank 会在候选集上再执行 Cross-Encoder 精排。
+    rag_pipeline: str = "hybrid-rerank"
+    rag_candidate_k: int = 10
+    rag_rrf_k: int = 60
+    reranker_model_path: str = ""
+    reranker_batch_size: int = 8
     # NumpyBackend 的 JSON 索引路径
     kb_index_path: str = "app/sessions/kb_index.json"
     # ChromaBackend 的持久化目录与 collection 名
@@ -32,6 +44,10 @@ class Settings(BaseSettings):
 
     # Multi-Agent 配置（第6期）
     multi_agent_enabled: bool = False
+    # 仅 MultiAgentOrchestrator 模式生效：识别到 >=2 个独立任务才并行调用专家。
+    multi_task_enabled: bool = False
+    # True 时复用 Multi-Agent 的首轮 Router 调用判断是否并行拆分；False 时完全不判断。
+    multi_task_first_turn_enabled: bool = False
 
     # Memory 配置（第7期）
     memory_enabled: bool = True

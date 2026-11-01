@@ -14,6 +14,9 @@ from openai import OpenAI
 class Embedder:
     """OpenAI 或本地 Sentence-Transformers Embeddings 同步封装。"""
 
+    # 多个隔离评测 Agent 会复用同一个进程；缓存避免每条用例重复加载本地模型。
+    _local_model_cache: dict[tuple[str, str], object] = {}
+
     def __init__(
         self,
         api_key: str,
@@ -36,11 +39,14 @@ class Embedder:
             from sentence_transformers import SentenceTransformer
 
             source = model_path or model
-            self._local_model = SentenceTransformer(
-                source,
-                device=device,
-                local_files_only=True,
-            )
+            cache_key = (source, device)
+            if cache_key not in self._local_model_cache:
+                self._local_model_cache[cache_key] = SentenceTransformer(
+                    source,
+                    device=device,
+                    local_files_only=True,
+                )
+            self._local_model = self._local_model_cache[cache_key]
         else:
             raise ValueError(
                 f"不支持的 embedding backend: {backend}，可选值为 openai 或 local。"

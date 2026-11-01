@@ -8,7 +8,12 @@ search_knowledge 面向非结构化文本（退换货政策、配送说明、FAQ
 - numpy ：手写余弦相似度，零依赖，教学透明
 - chroma：嵌入式向量数据库，HNSW 索引，工程代表性
 
-为避免每次进程启动都重建索引，单例缓存 Retriever。
+检索流水线由 settings.rag_pipeline 切换：
+- dense：仅向量召回
+- hybrid：Dense + BM25，经 RRF 融合
+- hybrid-rerank：Hybrid 先召回候选，再由本地 Cross-Encoder 精排
+
+为避免每次进程启动都重建索引或加载模型，单例缓存 Retriever。
 """
 
 from pathlib import Path
@@ -17,9 +22,13 @@ from typing import Optional
 from app.config.settings import settings
 from app.agent.rag.backends import create_backend
 from app.agent.rag.embedder import Embedder
+from app.agent.rag.hybrid import HybridRetriever
 from app.agent.rag.retriever import KnowledgeRetriever
+from app.agent.rag.reranker import LocalCrossEncoderReranker, RerankedRetriever
 
-_retriever: Optional[KnowledgeRetriever] = None
+_retriever: Optional[object] = None
+_effective_pipeline: Optional[str] = None
+_pipeline_warning: Optional[str] = None
 
 
 def _create_backend_from_settings():
@@ -38,8 +47,19 @@ def _create_backend_from_settings():
     )
 
 
-def _get_retriever() -> KnowledgeRetriever:
-    global _retriever
+def _normalized_pipeline() -> str:
+    pipeline = settings.rag_pipeline.strip().lower()
+    if pipeline not in {"dense", "hybrid", "hybrid-rerank"}:
+        raise ValueError(
+            "未知的 RAG_PIPELINE: "
+            f"{settings.rag_pipeline}（可选: dense / hybrid / hybrid-rerank）"
+        )
+    return pipeline
+
+
+def _get_retriever():
+    """创建线上检索流水线；reranker 不可用时安全降级为 Hybrid。"""
+    global _retriever, _effective_pipeline, _pipeline_warning
     if _retriever is None:
         embedder = Embedder(
             api_key=settings.openai_api_key,
@@ -50,15 +70,55 @@ def _get_retriever() -> KnowledgeRetriever:
             device=settings.embedding_device,
         )
         backend = _create_backend_from_settings()
-        _retriever = KnowledgeRetriever(embedder=embedder, backend=backend)
-        _retriever.load()
+        dense = KnowledgeRetriever(embedder=embedder, backend=backend)
+        dense.load()
+
+        pipeline = _normalized_pipeline()
+        _pipeline_warning = None
+        if pipeline == "dense":
+            _retriever = dense
+            _effective_pipeline = "dense"
+        else:
+            hybrid = HybridRetriever(
+                dense,
+                candidate_k=settings.rag_candidate_k,
+                rrf_k=settings.rag_rrf_k,
+            )
+            if pipeline == "hybrid":
+                _retriever = hybrid
+                _effective_pipeline = "hybrid"
+            else:
+                try:
+                    if not settings.reranker_model_path.strip():
+                        raise ValueError("RERANKER_MODEL_PATH 未配置")
+                    reranker = LocalCrossEncoderReranker(
+                        settings.reranker_model_path,
+                        device=settings.embedding_device,
+                        batch_size=settings.reranker_batch_size,
+                    )
+                    _retriever = RerankedRetriever(
+                        hybrid,
+                        reranker,
+                        candidate_k=settings.rag_candidate_k,
+                    )
+                    _effective_pipeline = "hybrid-rerank"
+                except Exception as exc:
+                    # 检索服务优先可用；同时把退化状态显式返回，避免误以为已精排。
+                    _retriever = hybrid
+                    _effective_pipeline = "hybrid"
+                    _pipeline_warning = (
+                        "hybrid-rerank 初始化失败，已降级为 hybrid："
+                        f"{type(exc).__name__}: {exc}"
+                    )
     return _retriever
 
 
 def reset_retriever() -> None:
     """清空单例缓存（测试或切换后端时使用）。"""
-    global _retriever
+    global _retriever, _effective_pipeline, _pipeline_warning
     _retriever = None
+    _effective_pipeline = None
+    _pipeline_warning = None
 
 
 def search_knowledge(query: str, top_k: int = 3) -> dict:
@@ -68,6 +128,7 @@ def search_knowledge(query: str, top_k: int = 3) -> dict:
         {
           "success": bool,
           "backend": "numpy" | "chroma",
+          "pipeline": "dense" | "hybrid" | "hybrid-rerank",
           "query": str,
           "results": [
             {
@@ -111,9 +172,10 @@ def search_knowledge(query: str, top_k: int = 3) -> dict:
     top_k = max(1, min(int(top_k or 3), 5))
     hits = retriever.search(query, top_k=top_k)
 
-    return {
+    payload = {
         "success": True,
         "backend": settings.rag_backend,
+        "pipeline": _effective_pipeline,
         "query": query,
         "results": [
             {
@@ -130,3 +192,6 @@ def search_knowledge(query: str, top_k: int = 3) -> dict:
             for h in hits
         ],
     }
+    if _pipeline_warning:
+        payload["warning"] = _pipeline_warning
+    return payload

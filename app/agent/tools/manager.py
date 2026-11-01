@@ -21,6 +21,7 @@ class ToolManager:
         allowed_tools: Optional[set] = None,
     ):
         self._mcp_client = None
+        self._memory_manager = None
         self._tool_source: dict[str, str] = {}
         self._tool_defs: list[dict] = []
 
@@ -82,6 +83,10 @@ class ToolManager:
     def tool_definitions(self) -> list[dict]:
         return self._tool_defs
 
+    def set_memory_manager(self, memory_manager) -> None:
+        """Bind memory lookup to this Agent instance, not a process-global slot."""
+        self._memory_manager = memory_manager
+
     def execute_tool(self, name: str, arguments: dict) -> str:
         """根据工具来源分发调用。"""
         source = self._tool_source.get(name)
@@ -90,7 +95,9 @@ class ToolManager:
             return self._mcp_client.call_tool(name, arguments)
 
         if source == "local":
-            return local_execute_tool(name, arguments)
+            return local_execute_tool(
+                name, arguments, memory_manager=self._memory_manager,
+            )
 
         return json.dumps({"error": f"未知工具: {name}"}, ensure_ascii=False)
 

@@ -3,6 +3,7 @@
 流程：Router 分类意图 → 选择子 Agent → ReAct 执行 → 结构化提取 → 持久化。
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from openai import OpenAI
@@ -12,6 +13,7 @@ from app.agent.summarizer import summarize
 from app.config.settings import settings
 from app.multi_agent.agents import AGENT_CONFIGS, SubAgent
 from app.multi_agent.router import Router
+from app.multi_agent.planner import PlannedTask
 from app.schemas.response import CustomerServiceResponse, IntentType
 from app.agent.tools.manager import ToolManager
 
@@ -19,13 +21,22 @@ from app.agent.tools.manager import ToolManager
 class MultiAgentOrchestrator:
     """多 Agent 编排器，对外接口与 EcomAgent 一致。"""
 
-    def __init__(self, session_path: Optional[str] = None):
+    def __init__(
+        self,
+        session_path: Optional[str] = None,
+        user_id: Optional[str] = None,
+        memory_dir: Optional[str] = None,
+        context_archive_dir: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ):
         self.client = OpenAI(
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url,
         )
         self.model = settings.model_name
         self.temperature = settings.temperature
+        self.user_id = user_id or settings.memory_user_id
+        self.session_id = session_id
         self.session_path = session_path or settings.session_path
         self.history_threshold = settings.history_threshold
         self.history_keep_recent = settings.history_keep_recent
@@ -53,15 +64,15 @@ class MultiAgentOrchestrator:
         self.memory_manager = MemoryManager(
             client=self.client,
             model=self.model,
-            user_id=settings.memory_user_id,
-            memory_dir=settings.memory_dir,
+            user_id=self.user_id,
+            memory_dir=memory_dir or settings.memory_dir,
             memory_enabled=settings.memory_enabled,
             max_ltm_facts=settings.max_ltm_facts,
         )
 
         if settings.memory_enabled:
-            from app.agent.tools.memory_tool import set_memory_manager
-            set_memory_manager(self.memory_manager)
+            for sub_agent in self.agents.values():
+                sub_agent.tool_manager.set_memory_manager(self.memory_manager)
 
         from app.agent.skills import SkillManager
         self.skill_manager = SkillManager(
@@ -90,7 +101,19 @@ class MultiAgentOrchestrator:
         """路由 → 子 Agent 执行 → 结构化提取 → 返回结果。"""
         self.raw_messages.append({"role": "user", "content": user_input})
 
-        agent_key = self.router.route(user_input, self.raw_messages)
+        if settings.multi_task_enabled and settings.multi_task_first_turn_enabled:
+            agent_key, tasks = self.router.route_or_plan(user_input, self.raw_messages)
+        else:
+            agent_key, tasks = None, []
+        if len(tasks) >= 2:
+            result, new_messages = self._handle_parallel(tasks)
+            self.raw_messages.extend(new_messages)
+            self.memory_manager.update_short_term(self.raw_messages[-6:])
+            self.raw_messages.append({"role": "assistant", "content": result.model_dump_json(ensure_ascii=False)})
+            save_session(self.session_path, self.raw_messages, self.summary, short_term_memory=self.memory_manager.stm_to_dict())
+            return result
+
+        agent_key = agent_key or self.router.route(user_input, self.raw_messages)
         agent = self.agents[agent_key]
         print(f"\n🔀 [路由] → {agent.name}")
 
@@ -116,6 +139,33 @@ class MultiAgentOrchestrator:
             short_term_memory=self.memory_manager.stm_to_dict(),
         )
         return result
+
+    def _handle_parallel(self, tasks: list[PlannedTask]) -> tuple[CustomerServiceResponse, list[dict]]:
+        """并行运行互不依赖的专家，并用合并器产出一条面向用户的回复。"""
+        print(f"\n🧩 [多任务] 并行执行 {len(tasks)} 个子任务：{', '.join(t.agent for t in tasks)}")
+
+        def run(task: PlannedTask):
+            agent = self.agents[task.agent]
+            messages = self._build_messages(agent)
+            messages[-1] = {"role": "user", "content": task.query}
+            return task, agent.handle(messages, max_steps=self.max_react_steps)
+
+        with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
+            completed = list(pool.map(run, tasks))
+
+        new_messages: list[dict] = []
+        parts: list[str] = []
+        for task, (text, messages) in completed:
+            new_messages.extend(messages)
+            parts.append(f"[{task.agent}]\n{text}")
+        merge_prompt = """将以下多个客服专家的结果合并成一条简洁、无重复的中文回复。
+保留每个子任务的关键事实；不要编造，也不要泄露内部 agent 名称。\n\n""" + "\n\n".join(parts)
+        response = self.client.chat.completions.create(
+            model=self.model, temperature=0.0,
+            messages=[{"role": "user", "content": merge_prompt}],
+        )
+        merged = response.choices[0].message.content or "\n".join(parts)
+        return self._extract_structured_response(merged), new_messages
 
     def reset(self):
         self.raw_messages = []

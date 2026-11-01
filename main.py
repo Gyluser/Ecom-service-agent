@@ -1,4 +1,9 @@
 from app.agent.chat import EcomAgent
+from app.agent.session_identity import (
+    build_local_session_context,
+    new_user_id,
+    validate_local_id,
+)
 from app.config.settings import settings
 from app.schemas.response import IntentType
 
@@ -17,12 +22,36 @@ INTENT_LABELS = {
 
 
 def main():
+    print("=" * 50)
+    print("  本地多用户演示：回车创建新用户；输入已有 user_id 可复用其长期记忆")
+    print("=" * 50)
+    while True:
+        entered_user_id = input("本地 user_id（回车新建）: ").strip()
+        if not entered_user_id:
+            user_id = new_user_id()
+            print(f"已创建本地用户：{user_id}")
+            print("请保存这个 user_id；下次输入它可读取同一用户的长期记忆。")
+            break
+        try:
+            user_id = validate_local_id(entered_user_id, "user_id")
+            break
+        except ValueError as exc:
+            print(f"⚠️  {exc}")
+
+    local_context = build_local_session_context(user_id)
+    agent_kwargs = {
+        "session_path": str(local_context.session_path),
+        "user_id": local_context.user_id,
+        "memory_dir": str(local_context.memory_dir),
+        "context_archive_dir": str(local_context.context_archive_dir),
+        "session_id": local_context.session_id,
+    }
     if settings.multi_agent_enabled:
         from app.multi_agent.orchestrator import MultiAgentOrchestrator
-        agent = MultiAgentOrchestrator()
+        agent = MultiAgentOrchestrator(**agent_kwargs)
         mode = "Multi-Agent 协作模式"
     else:
-        agent = EcomAgent()
+        agent = EcomAgent(**agent_kwargs)
         mode = "ReAct + MCP + RAG"
 
     print("=" * 50)
@@ -30,6 +59,9 @@ def main():
     print("  支持工具调用 + 政策检索 + 用户记忆 + 技能编排")
     print("  输入 quit/exit 退出, reset 重置, memory 查看记忆, skills 查看技能")
     print("=" * 50)
+    print(f"👤 用户: {local_context.user_id}")
+    print(f"💬 新会话: {local_context.session_id}")
+    print(f"📁 会话目录: {local_context.session_dir}\n")
     print()
 
     if agent.history_size > 0:
